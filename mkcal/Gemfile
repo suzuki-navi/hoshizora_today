@@ -1,5 +1,6 @@
 source "https://rubygems.org"
 
 gem 'mk_time'
+gem 'eph_bpn'
 gem 'eph_jpl'
 

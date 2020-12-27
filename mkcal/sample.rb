@@ -1,5 +1,6 @@
 require 'time'
 require 'mk_time'
+require 'eph_bpn'
 require 'eph_jpl'
 
 $data_path = '../var/de430/ssd.jpl.nasa.gov/pub/eph/planets/Linux/de430/linux_p1550p2650.430'
@@ -12,7 +13,40 @@ $startTime = Time.parse("2020-12-31T15:00:00.000Z")
 $endTime = Time.parse("2021-01-31T15:00:00.000Z")
 
 def main
+  mkcalSun
   mkcalMoon
+end
+
+def mkcalSun
+  time = $startTime
+  v = -1
+  while time < $endTime
+    wday = time.wday
+    sm = sunEclipticLng(time) * $pi57
+    v2 = (sm / 15).to_i
+    if v != v2
+      msg = nil
+      if v2 == 0
+        msg = "春分"
+      elsif v2 == 6
+        msg = "夏至"
+      elsif v2 == 12
+        msg = "秋分"
+      elsif v2 == 18
+        msg = "冬至"
+      end
+      if v >= 0
+        if msg == nil
+          msg = "太陽の黄経が#{v2 * 15}度です。"
+        else
+          msg = "#{msg}。太陽の黄経が#{v2 * 15}度です。"
+        end
+        mkcalPuts(time - 2700, msg)
+      end
+      v = v2
+    end
+    time = time + 3600
+  end
 end
 
 def mkcalMoon
@@ -36,6 +70,14 @@ def mkcalMoon
     end
     time = time + 3600
   end
+end
+
+def sunEclipticLng(time)
+  sun = ephXyz(:sun, time)
+  sun = xyzGCRSToTrueEcliptic(sun, time)
+  sunLng = Math.atan2(sun[1], sun[0])
+  sunLng += $pi2 if (sunLng < 0)
+  sunLng
 end
 
 def lngDistanceSunMoon(time)
@@ -73,6 +115,17 @@ def ephXyz(target, time)
     $ephXyzCache[key] = ret
   end
   return ret
+end
+
+def xyzGCRSToTrueEquatorial(xyz, time)
+  bpn = EphBpn::Ephemeris.new(time)
+  bpn.apply_bias_prec_nut(xyz)
+end
+
+def xyzGCRSToTrueEcliptic(xyz, time)
+  bpn = EphBpn::Ephemeris.new(time)
+  xyz2 = bpn.apply_bias_prec_nut(xyz)
+  rotationX(xyz2, -bpn.eps)
 end
 
 def xyzEquatorialToEcliptic(xyz)

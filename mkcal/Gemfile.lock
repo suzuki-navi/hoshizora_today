@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    eph_bpn (0.1.11)
     eph_jpl (0.1.1)
     mk_time (0.4.0)
 
@@ -8,6 +9,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  eph_bpn
   eph_jpl
   mk_time
 
