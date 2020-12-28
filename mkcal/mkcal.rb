@@ -12,8 +12,8 @@ $pi5 = 0.5 * Math::PI
 $pi57 = 180.0 / Math::PI
 
 def main(args)
-  startTime = Time.parse("2021-01-01T00:00:00.000+09:00")
-  endTime   = Time.parse("2021-01-06T00:00:00.000+09:00")
+  startTime = Time.parse("2020-12-28T00:00:00.000+09:00")
+  endTime   = Time.parse("2021-02-01T00:00:00.000+09:00")
 
   $stdout.sync = true
 
@@ -25,37 +25,12 @@ end
 
 def mkcal(startTime, endTime)
   sunTerm24str = [
-    "春分",
-    "清明",
-    "穀雨",
-    "立夏",
-    "小満",
-    "芒種",
-    "夏至",
-    "小暑",
-    "大暑",
-    "立秋",
-    "処暑",
-    "白露",
-    "秋分",
-    "寒露",
-    "霜降",
-    "立冬",
-    "小雪",
-    "大雪",
-    "冬至",
-    "小寒",
-    "大寒",
-    "立春",
-    "雨水",
-    "啓蟄",
+    "春分", "清明", "穀雨", "立夏", "小満", "芒種", "夏至", "小暑", "大暑", "立秋", "処暑", "白露",
+    "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒", "立春", "雨水", "啓蟄",
   ]
 
   moonTermStr = [
-    "新月",
-    "上弦の月",
-    "満月",
-    "下弦の月",
+    "新月", "上弦の月", "満月", "下弦の月",
   ]
 
   timeJST = startTime.localtime("+09:00")
@@ -84,15 +59,18 @@ def mkcal(startTime, endTime)
 
     sun = ephXyz(:sun, time)
     sunTE = xyzGCRSToTrueEcliptic(sun, time)
-    sunLng = Math.atan2(sunTE[1], sunTE[0])
-    sunLng += $pi2 if (sunLng < 0)
+    sunLng = calcLng(sunTE)
 
     sunDistance = calcDistance(sun)
 
     sunTerm24b = (sunLng * $pi57 / 15).to_i
     if sunTerm24 != sunTerm24b
       if sunTerm24 >= 0
-        mkcalPuts(time - 2700, "#{sunTerm24str[sunTerm24b]}。太陽の黄経が#{sunTerm24b * 15}°です。")
+        msg = "#{sunTerm24str[sunTerm24b]}。太陽の黄経が#{sunTerm24b * 15}°です"
+        if sunTerm24b % 6 != 0
+          msg = "二十四節気の" + msg
+        end
+        mkcalPuts(time - 2700, msg)
       end
       sunTerm24 = sunTerm24b
     end
@@ -120,8 +98,7 @@ def mkcal(startTime, endTime)
 
     moon = ephXyz(:moon, time)
     moonTE = xyzGCRSToTrueEcliptic(moon, time)
-    moonLng = Math.atan2(moonTE[1], moonTE[0])
-    moonLng += $pi2 if (moonLng < 0)
+    moonLng = calcLng(moonTE)
 
     moonSunLng = moonLng - sunLng
     moonSunLng += $pi2 if (moonSunLng < 0)
@@ -135,6 +112,13 @@ def mkcal(startTime, endTime)
       moonTerm = moonTermB
     end
 
+    if moonSunLng360 >= 90 && moonSunLng360 < 225 && timeJST.hour == 21
+      moonCons = j2000ToConstellations(moon)
+      if moonCons != nil
+        mkcalPuts(time - 600, "月は#{moonCons}にいます")
+      end
+    end
+
     ################################
 
     if timeJST.hour == 0
@@ -142,6 +126,53 @@ def mkcal(startTime, endTime)
     end
     timeJST = timeJST + 3600
   end
+end
+
+####################################################################################################
+
+$constellationsMap = {
+  [ 35, 10] => "おひつじ座とくじら座の頭の間",
+  [ 40, 10] => "おひつじ座とくじら座の頭の間",
+  [ 45, 15] => "おひつじ座のしっぽ側",
+  [ 60, 15] => "おうし座ヒアデスの西",
+  [ 65, 20] => "おうし座とペルセウス座とぎょしゃ座の間",
+  [ 70, 20] => "おうし座ヒアデスの北東",
+  [ 75, 20] => "おうし座の角付近",
+  [ 80, 20] => "おうし座の角とぎょしゃ座付近",
+  [ 85, 20] => "おうし座の角とオリオン座の腕付近",
+  [ 90, 20] => "ふたご座の西側の子の足元とオリオン座の腕付近",
+  [ 95, 20] => "ふたご座の西側の子の足元付近",
+  [100, 20] => "ふたご座の2人の足元付近",
+  [100, 25] => "ふたご座の西側の子の胴体付近",
+  [105, 20] => "ふたご座の東側の子の腰付近",
+  [110, 20] => "ふたご座の東側の子の胴体付近",
+  [115, 20] => "ふたご座ポルックスの南でふたご座の東",
+  [120, 20] => "かに座の西",
+  [125, 20] => "かに座",
+  [130, 20] => "かに座",
+  [135, 20] => "かに座の東",
+  [140, 15] => "しし座とかに座の間",
+  [145, 15] => "しし座の西",
+  [150, 15] => "しし座の肩付近",
+  [155, 15] => "しし座の中央",
+  [160, 10] => "しし座の腹付近",
+  [165, 10] => "しし座の後ろ足付近",
+  [175,  5] => "おとめ座の頭付近",
+  [190,  0] => "おとめ座の胴体付近",
+  [200,-10] => "おとめ座スピカの北",
+}
+
+def j2000ToConstellations(xyz)
+  lng = calcLng(xyz) * $pi57
+  lat = calcLat(xyz) * $pi57
+  lng5 = (lng / 5).to_i * 5
+  lat5 = ((lat + 90) / 5).to_i * 5 - 90
+  key = [lng5, lat5]
+  cons = $constellationsMap[key]
+  if cons == nil
+    raise "#{lng5}(#{lng5/15}h+#{lng5%15*4}m), #{lat5}"
+  end
+  cons
 end
 
 ####################################################################################################
@@ -186,6 +217,21 @@ end
 
 def xyzEquatorialToEcliptic(xyz)
   return rotationX(xyz, -0.4090926)
+end
+
+def calcLng(xyz)
+  lng = Math.atan2(xyz[1], xyz[0])
+  lng += $pi2 if (lng < 0)
+  lng
+end
+
+def calcLat(xyz)
+  x = xyz[0]
+  y = xyz[1]
+  z = xyz[2]
+  xy = Math.sqrt(x * x + y * y)
+  lat = Math.atan2(z, xy)
+  lat
 end
 
 def calcDistance(xyz)
