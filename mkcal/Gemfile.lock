@@ -3,6 +3,7 @@ GEM
   specs:
     eph_bpn (0.1.11)
     eph_jpl (0.1.1)
+    holiday_japan (1.4.4)
     mk_time (0.4.0)
 
 PLATFORMS
@@ -11,6 +12,7 @@ PLATFORMS
 DEPENDENCIES
   eph_bpn
   eph_jpl
+  holiday_japan
   mk_time
 
 BUNDLED WITH
