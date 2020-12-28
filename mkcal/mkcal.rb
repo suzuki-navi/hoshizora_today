@@ -100,8 +100,7 @@ def mkcal(startTime, endTime)
     moonTE = xyzGCRSToTrueEcliptic(moon, time)
     moonLng = calcLng(moonTE)
 
-    moonSunLng = moonLng - sunLng
-    moonSunLng += $pi2 if (moonSunLng < 0)
+    moonSunLng = calcLngDiff(moonLng, sunLng)
     moonSunLng360 = moonSunLng * $pi57
     moonTermB = (moonSunLng360 / 90).to_i
 
@@ -112,10 +111,31 @@ def mkcal(startTime, endTime)
       moonTerm = moonTermB
     end
 
+    moonConsFlag = false
+
     if moonSunLng360 >= 90 && moonSunLng360 < 225 && timeJST.hour == 21
+      moonConsFlag = true
       moonCons = j2000ToConstellations(moon)
       if moonCons != nil
         mkcalPuts(time - 600, "月は#{moonCons}にいます")
+      end
+    end
+
+    ################################
+    # 火星
+    ################################
+
+    mars = ephXyz(:mars, time)
+    marsTE = xyzGCRSToTrueEcliptic(mars, time)
+    marsLng = calcLng(marsTE)
+
+    marsSunLng = calcLngDiff(marsLng, sunLng)
+    marsSunLng360 = marsSunLng * $pi57
+
+    if marsSunLng360 >= 90 && marsSunLng360 < 225 && timeJST.wday == 2 && timeJST.hour == 21 && !moonConsFlag
+      marsCons = j2000ToConstellations(mars)
+      if marsCons != nil
+        mkcalPuts(time - 600, "火星は#{marsCons}にいます")
       end
     end
 
@@ -131,6 +151,8 @@ end
 ####################################################################################################
 
 $constellationsMap = {
+  [ 25, 10] => "うお座の東側の魚(アンドロメダ座の南)のしっぽ付近",
+  [ 30, 10] => "おひつじ座の頭とくじら座の頭の間",
   [ 35, 10] => "おひつじ座とくじら座の頭の間",
   [ 40, 10] => "おひつじ座とくじら座の頭の間",
   [ 45, 15] => "おひつじ座のしっぽ側",
@@ -190,6 +212,8 @@ def ephXyz(target, time)
       target_id = 11
     elsif target == :moon
       target_id = 10
+    elsif target == :mars
+      target_id = 4
     else
       raise
     end
@@ -232,6 +256,12 @@ def calcLat(xyz)
   xy = Math.sqrt(x * x + y * y)
   lat = Math.atan2(z, xy)
   lat
+end
+
+def calcLngDiff(lngTarget, lngCenter)
+  d = lngTarget - lngCenter
+  d += $pi2 if d < 0
+  d
 end
 
 def calcDistance(xyz)
