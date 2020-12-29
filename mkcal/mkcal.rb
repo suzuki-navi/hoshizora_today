@@ -12,13 +12,16 @@ $pi5 = 0.5 * Math::PI
 $pi57 = 180.0 / Math::PI
 
 def main(args)
-  startTime = Time.parse("2020-12-28T00:00:00.000+09:00")
-  endTime   = Time.parse("2021-02-01T00:00:00.000+09:00")
+  startTimeJST = Time.parse("2020-12-28T00:00:00.000+09:00")
+  endTimeJST   = Time.parse("2021-02-01T00:00:00.000+09:00")
 
   $stdout.sync = true
 
-  puts("# #{startTime} - #{endTime}")
-  mkcal(startTime, endTime)
+  puts("# #{startTimeJST} - #{endTimeJST}")
+  #startTime = Time.at(startTimeJST).localtime("UTC")
+  #endTime = Time.at(endTimeJST).localtime("UTC")
+
+  mkcal(startTimeJST, endTimeJST)
 end
 
 ####################################################################################################
@@ -33,7 +36,14 @@ def mkcal(startTime, endTime)
     "新月", "上弦の月", "満月", "下弦の月",
   ]
 
-  timeJST = startTime.localtime("+09:00")
+  objectNames = {
+    moon: "月",
+    mars: "火星",
+    jupiter: "木星",
+    saturn: "土星",
+  }
+
+  timeJST = startTime
 
   sunTerm24 = -1
   sunDistanceFlag = nil
@@ -45,6 +55,8 @@ def mkcal(startTime, endTime)
     time = Time.at(timeJST)
     time.localtime("UTC")
 
+    calcData(time)
+
     if timeJST.hour == 9
       date = Date.new(timeJST.year, timeJST.month, timeJST.mday)
       holiday = HolidayJapan.name(date)
@@ -53,17 +65,13 @@ def mkcal(startTime, endTime)
       end
     end
 
+    timeData = $ephData[time]
+
     ################################
     # 太陽
     ################################
 
-    sun = ephXyz(:sun, time)
-    sunTE = xyzGCRSToTrueEcliptic(sun, time)
-    sunLng = calcLng(sunTE)
-
-    sunDistance = calcDistance(sun)
-
-    sunTerm24b = (sunLng * $pi57 / 15).to_i
+    sunTerm24b = (timeData[:sun][:lng] * $pi57 / 15).to_i
     if sunTerm24 != sunTerm24b
       if sunTerm24 >= 0
         msg = "#{sunTerm24str[sunTerm24b]}。太陽の黄経が#{sunTerm24b * 15}°です"
@@ -75,6 +83,7 @@ def mkcal(startTime, endTime)
       sunTerm24 = sunTerm24b
     end
 
+    sunDistance = timeData[:sun][:distance]
     if sunDistanceFlag != nil
       if sunDistanceFlag && sunPrevDistance > sunDistance
         mkcalPuts(time - 4500, "地球が遠日点通過")
@@ -96,13 +105,7 @@ def mkcal(startTime, endTime)
     # 月
     ################################
 
-    moon = ephXyz(:moon, time)
-    moonTE = xyzGCRSToTrueEcliptic(moon, time)
-    moonLng = calcLng(moonTE)
-
-    moonSunLng = calcLngDiff(moonLng, sunLng)
-    moonSunLng360 = moonSunLng * $pi57
-    moonTermB = (moonSunLng360 / 90).to_i
+    moonTermB = (timeData[:moon][:sunLng360] / 90).to_i
 
     if moonTerm != moonTermB
       if moonTerm >= 0
@@ -111,31 +114,34 @@ def mkcal(startTime, endTime)
       moonTerm = moonTermB
     end
 
-    moonConsFlag = false
+    ################################
+    # 月・惑星の位置
+    ################################
 
-    if moonSunLng360 >= 90 && moonSunLng360 < 225 && timeJST.hour == 21
-      moonConsFlag = true
-      moonCons = j2000ToConstellations(moon)
-      if moonCons != nil
-        mkcalPuts(time - 600, "月は#{moonCons}にいます")
-      end
+    wday = timeJST.wday
+    if wday == 0
+      p = [:moon]
+    elsif wday == 1
+      p = [:moon]
+    elsif wday == 2
+      p = [:moon, :mars]
+    elsif wday == 3
+      p = [:moon]
+    elsif wday == 4
+      p = [:moon]
+    elsif wday == 5
+      p = [:moon]
+    elsif wday == 6
+      p = [:moon]
     end
 
-    ################################
-    # 火星
-    ################################
-
-    mars = ephXyz(:mars, time)
-    marsTE = xyzGCRSToTrueEcliptic(mars, time)
-    marsLng = calcLng(marsTE)
-
-    marsSunLng = calcLngDiff(marsLng, sunLng)
-    marsSunLng360 = marsSunLng * $pi57
-
-    if marsSunLng360 >= 90 && marsSunLng360 < 225 && timeJST.wday == 2 && timeJST.hour == 21 && !moonConsFlag
-      marsCons = j2000ToConstellations(mars)
-      if marsCons != nil
-        mkcalPuts(time - 600, "火星は#{marsCons}にいます")
+    p.each do |target|
+      objSunLng360 = timeData[target][:sunLng360]
+      if objSunLng360 >= 90 && objSunLng360 < 225 && timeJST.hour == 21
+        cons = j2000ToConstellations(timeData[target][:xyz])
+        if cons != nil
+          mkcalPuts(time - 600, "#{objectNames[target]}は#{cons}にいます")
+        end
       end
     end
 
@@ -192,40 +198,92 @@ def j2000ToConstellations(xyz)
   key = [lng5, lat5]
   cons = $constellationsMap[key]
   if cons == nil
-    raise "#{lng5}(#{lng5/15}h+#{lng5%15*4}m), #{lat5}"
+    puts("# ERROR #{lng5}(#{lng5/15}h+#{lng5%15*4}m), #{lat5}")
   end
   cons
 end
 
 ####################################################################################################
 
-$ephXyzCache = {}
+$ephData = {}
 
-def ephXyz(target, time)
-  # target: sun / moon
-  # time: UTC DateTime型
-  key = [target, time]
-  ret = $ephXyzCache[key]
-  if ret == nil
-    ttjd = MkTime::Calc.new(MkTime::Calc.new(time).tt).jd
-    if target == :sun
-      target_id = 11
-    elsif target == :moon
-      target_id = 10
-    elsif target == :mars
-      target_id = 4
-    else
-      raise
-    end
-    ephJpl = EphJpl.new($data_path, target_id, 3, ttjd)
-    value = ephJpl.calc
-    x = value[0]
-    y = value[1]
-    z = value[2]
-    ret = [x, y, z]
-    $ephXyzCache[key] = ret
+def calcData(time)
+  timeData = {}
+  [:sun, :moon, :mars].each do |target|
+    #puts("#{time} {target}")
+    xyz = fetchEphXyz(target, time)
+    eclipticXyz = xyzGCRSToTrueEcliptic(xyz, time)
+    distance = calcDistance(xyz)
+    lng = calcLng(eclipticXyz)
+    timeData[target] = {
+      xyz: xyz,
+      eclipticXyz: eclipticXyz,
+      distance: distance,
+      lng: lng,
+    }
   end
-  return ret
+  [:moon, :mars].each do |target|
+    sunLng = calcLngDiff(timeData[target][:lng], timeData[:sun][:lng])
+    sunLng360 = sunLng * $pi57
+    timeData[target][:sunLng360] = sunLng360
+  end
+  $ephData[time] = timeData
+end
+
+def objXyz(target, time)
+  key = [time, target, :xyz]
+  ret = $ephCache[key]
+  if ret == nil
+    ret = fetchEphXyz(target, time)
+    $ephCache[key] = ret
+  end
+  ret
+end
+
+def objTrueEcliptic(target, time)
+  key = [time, target, :trueEcliptic]
+  ret = $ephCache[key]
+  if ret == nil
+    xyz = objXyz(target, time)
+    ret = xyzGCRSToTrueEcliptic(xyz)
+    $ephCache[key] = ret
+  end
+  ret
+end
+
+def objDistance(target, time)
+  key = [time, target, :trueEcliptic]
+  ret = $ephCache[key]
+  if ret == nil
+    xyz = objXyz(target, time)
+    ret = calcDistance(xyz)
+    $ephCache[key] = ret
+  end
+  ret
+end
+
+def fetchEphXyz(target, time)
+  # time: UTC DateTime型
+  ttjd = MkTime::Calc.new(MkTime::Calc.new(time).tt).jd
+  if target == :sun
+    target_id = 11
+  elsif target == :moon
+    target_id = 10
+  elsif target == :mars
+    target_id = 4
+  elsif target == :jupiter
+    target_id = 5
+  elsif target == :saturn
+    target_id = 6
+  else
+    raise
+  end
+  ephJpl = EphJpl.new($data_path, target_id, 3, ttjd)
+  value = ephJpl.calc
+  x = value[0]
+  y = value[1]
+  z = value[2]
+  [x, y, z]
 end
 
 def xyzGCRSToTrueEquatorial(xyz, time)
@@ -287,7 +345,7 @@ def mkcalPuts(time, msg)
 end
 
 def mkcalTimeStr(time)
-  (time + 9 * 3600).strftime('%Y-%m-%d %H:%M:%S')
+  (time + 9 * 3600).strftime('%Y-%m-%dT%H:%M')
 end
 
 ####################################################################################################
