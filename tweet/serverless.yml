@@ -22,5 +22,6 @@ functions:
       TWITTER_CONSUMER_SECRET: ${self:custom.environment.twitter_consumer_secret}
       TWITTER_TOKEN:           ${self:custom.environment.twitter_token}
       TWITTER_TOKEN_SECRET:    ${self:custom.environment.twitter_token_secret}
+      SLACK_WEBHOOK_URL: ${self:custom.environment.slack_webhook_url}
 plugins:
   - serverless-python-requirements

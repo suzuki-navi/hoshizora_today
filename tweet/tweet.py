@@ -1,5 +1,8 @@
 import datetime
+import json
 import os
+import urllib
+
 import boto3
 import twitter
 
@@ -11,20 +14,21 @@ twitter_consumer_key    = os.environ["TWITTER_CONSUMER_KEY"]
 twitter_consumer_secret = os.environ["TWITTER_CONSUMER_SECRET"]
 twitter_token           = os.environ["TWITTER_TOKEN"]
 twitter_token_secret    = os.environ["TWITTER_TOKEN_SECRET"]
+slack_webhook_url = os.environ["SLACK_WEBHOOK_URL"]
+
 
 def main(event, context):
     now = datetime.datetime.utcnow()
     for record in readDataLines(now):
         message = record[1]
-        print(f"tweet: {message}")
         tweet(message)
-        #postSlack(message)
+        postSlack(message)
+        print(f"tweet: {message}")
 
 def readDataLines(now):
     lines1 = readS3Object().split(sep='\n')
     lines2 = [parseDataLine(line) for line in lines1]
     lines3 = [line for line in lines2 if line != None]
-    print(lines3)
     lines4 = [line for line in lines3 if isTimeMatch(line, now)]
     return lines4
 
@@ -68,4 +72,12 @@ def tweet(message):
        )
     client = twitter.Twitter(auth = auth)
     client.statuses.update(status = message)
+
+def postSlack(message):
+    post_data = { "text": message }
+    headers = { "Content-Type": "application/json" }
+    req = urllib.request.Request(slack_webhook_url, json.dumps(post_data).encode(), headers)
+    with urllib.request.urlopen(req) as res:
+        webhook_body = res.read()
+    #print(webhook_body)
 
