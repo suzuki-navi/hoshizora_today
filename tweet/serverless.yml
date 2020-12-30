@@ -1,0 +1,26 @@
+service: hoshizora-tweet
+frameworkVersion: '2'
+
+custom:
+  environment: ${file(./config.yml)}
+provider:
+  name: aws
+  runtime: python3.8
+  profile: ${self:custom.environment.profile}
+  region: ap-northeast-1
+  iamManagedPolicies:
+    - arn:aws:iam::aws:policy/AmazonS3FullAccess
+functions:
+  hello:
+    handler: tweet.main
+    events:
+      - schedule: cron(*/5 * * * ? *)
+    environment:
+      DATA_S3_BUCKET: ${self:custom.environment.data_s3_bucket}
+      DATA_S3_KEY:    ${self:custom.environment.data_s3_key}
+      TWITTER_CONSUMER_KEY:    ${self:custom.environment.twitter_consumer_key}
+      TWITTER_CONSUMER_SECRET: ${self:custom.environment.twitter_consumer_secret}
+      TWITTER_TOKEN:           ${self:custom.environment.twitter_token}
+      TWITTER_TOKEN_SECRET:    ${self:custom.environment.twitter_token_secret}
+plugins:
+  - serverless-python-requirements
