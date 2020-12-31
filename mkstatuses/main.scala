@@ -17,7 +17,7 @@ val pi57 = 180.0 / Math.PI;
 println("# time: %s - %s".format(startTime, endTime));
 
 val PLANET_COUNT = 3;
-val ELEMENT_COUNT = 4;
+val ELEMENT_COUNT = 6;
 
 val SUN_OFFSET  = 0 * ELEMENT_COUNT;
 val MOON_OFFSET = 1 * ELEMENT_COUNT;
@@ -26,6 +26,8 @@ val DISTANCE_IDX       = 0;
 val J2000_LNG_IDX      = 1;
 val J2000_LAT_IDX      = 2;
 val T_ECLIPTIC_LNG_IDX = 3;
+val HCS_AZI_IDX        = 4;
+val HCS_ALT_IDX        = 5;
 
 def readData(): IndexedSeq[(Instant, OffsetDateTime, IndexedSeq[Double])] = {
   val input = new DataInputStream(new BufferedInputStream(new FileInputStream(planetsDataPath)));
@@ -36,7 +38,6 @@ def readData(): IndexedSeq[(Instant, OffsetDateTime, IndexedSeq[Double])] = {
       input.readDouble();
     }
     val timeJst = OffsetDateTime.ofInstant(time, jst);
-    //println((time, timeJst, timeJst.toString));
     (time, timeJst, data);
   }
   input.close();
@@ -47,6 +48,8 @@ def putMessage(timeJst: OffsetDateTime, message: String): Unit = {
   val timeStr = timeJst.toString.substring(0, 16);
   println("%s %s".format(timeStr, message));
 }
+
+println("# reading ...");
 
 val data = readData();
 val durationCount = data.size;
@@ -163,8 +166,9 @@ def calcMoon(): Unit = {
 
   (0 until durationCount6).map { i =>
     if (data6(i)._2.getHour() == 21) {
-      val d = moonSunLng360(i);
-      if (d >= 90 && d < 225) {
+      if (data6(i)._3(MOON_OFFSET + HCS_ALT_IDX) * pi57 >= 20) {
+      //val d = moonSunLng360(i);
+      //if (d >= 90 && d < 225) {
         val lng = data6(i)._3(MOON_OFFSET + J2000_LNG_IDX);
         val lat = data6(i)._3(MOON_OFFSET + J2000_LAT_IDX);
         val cons = j2000ToConstellations(lng, lat);

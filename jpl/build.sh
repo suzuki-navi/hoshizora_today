@@ -15,3 +15,5 @@ fi
 
 bundle exec ruby ./main.rb $start $end
 
+mv ../var/planets.dat.new ../var/planets.dat
+

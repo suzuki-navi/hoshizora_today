@@ -2,13 +2,17 @@ require 'time'
 require 'mk_time'
 require 'eph_bpn'
 require 'eph_jpl'
+require 'mk_greenwich'
 
 $jpl_data_path = '../var/ssd.jpl.nasa.gov/pub/eph/planets/Linux/de430/linux_p1550p2650.430'
-$planets_data_path = '../var/planets.dat'
+$planets_data_path = '../var/planets.dat.new'
 
 $pi2 = 2.0 * Math::PI
 $pi5 = 0.5 * Math::PI
 $pi57 = 180.0 / Math::PI
+
+$tokyoLng = 139.7 / $pi57
+$tokyoLat = 35.7 / $pi57
 
 def main(args)
   startTime = Time.parse(args[0] + "T00:00:00+09:00").localtime("UTC")
@@ -18,7 +22,7 @@ def main(args)
     while time < endTime
       puts("time: #{time}")
       data = calcData(time)
-      buf = data.pack("G12")
+      buf = data.pack("G#{data.length}")
       fp.write(buf)
       time = time + 600
     end
@@ -29,19 +33,26 @@ def calcData(time)
   # time: UTC DateTime型
   ttjd = MkTime::Calc.new(MkTime::Calc.new(time).tt).jd
   bpn = EphBpn::Ephemeris.new(time)
+  gw = MkGreenwich::Greenwich.new(time)
+
+  meps = -bpn.eps
+  mgast = $pi5 -gw.gast - $tokyoLng
+  mlat = $pi5 - $tokyoLat
 
   data = []
   [:sun, :moon, :mars].each do |target|
     xyz = calcXyz(target, ttjd)
     trueEquatorialXyz = bpn.apply_bias_prec_nut(xyz)
-    trueEclipticXyz = rotationX(trueEquatorialXyz, -bpn.eps)
+    trueEclipticXyz = rotationX(trueEquatorialXyz, meps)
+    hcsXyz = rotationX(rotationZ(trueEquatorialXyz, mgast), mlat) # 地平座標系 X:西 Y:南 Z:天頂
     distance = calcDistance(xyz)
     j2000Lng = calcLng(xyz) # J2000.0をxyzで近似
     j2000Lat = calcLat(xyz)
     trueEclipticLng = calcLng(trueEclipticXyz)
-    data.push(distance, j2000Lng, j2000Lat, trueEclipticLng)
+    hcsAzi = calcAzi(hcsXyz)
+    hcsAlt = calcLat(hcsXyz)
+    data.push(distance, j2000Lng, j2000Lat, trueEclipticLng, hcsAzi, hcsAlt)
   end
-  p data
   return data
 end
 
@@ -76,8 +87,23 @@ def rotationX(xyz, th)
   return [x, y * cos - z * sin, y * sin + z * cos]
 end
 
+def rotationZ(xyz, th)
+  x = xyz[0]
+  y = xyz[1]
+  z = xyz[2]
+  cos = Math.cos(th)
+  sin = Math.sin(th)
+  return [x * cos - y * sin, x * sin + y * cos, z]
+end
+
 def calcLng(xyz)
   lng = Math.atan2(xyz[1], xyz[0])
+  lng += $pi2 if (lng < 0)
+  lng
+end
+
+def calcAzi(xyz)
+  lng = Math.atan2(-xyz[0], -xyz[1])
   lng += $pi2 if (lng < 0)
   lng
 end
