@@ -16,11 +16,12 @@ twitter_token           = os.environ["TWITTER_TOKEN"]
 twitter_token_secret    = os.environ["TWITTER_TOKEN_SECRET"]
 slack_webhook_url = os.environ["SLACK_WEBHOOK_URL"]
 
-
 def main(event, context):
     now = datetime.datetime.utcnow()
     for record in readDataLines(now):
         message = record[1]
+        if message.startswith("#"):
+            continue
         tweet(message)
         postSlack(message)
         print(f"tweet: {message}")
