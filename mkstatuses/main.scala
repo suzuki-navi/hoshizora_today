@@ -15,15 +15,20 @@ val jst = ZoneOffset.ofHours(+9);
 val pi57 = 180.0 / Math.PI;
 val pi = Math.PI;
 val pi2 = 2.0 * Math.PI;
+val pi5 = 0.5 * Math.PI;
 
 println("# time: %s - %s".format(startTime, endTime));
 
-val PLANET_COUNT = 3;
+val PLANET_COUNT = 7;
 val ELEMENT_COUNT = 6;
 
-val SUN_OFFSET  = 0 * ELEMENT_COUNT;
-val MOON_OFFSET = 1 * ELEMENT_COUNT;
-val MARS_OFFSET = 2 * ELEMENT_COUNT;
+val SUN_OFFSET     = 0 * ELEMENT_COUNT;
+val MOON_OFFSET    = 1 * ELEMENT_COUNT;
+val MERCURY_OFFSET = 2 * ELEMENT_COUNT;
+val VENUS_OFFSET   = 3 * ELEMENT_COUNT;
+val MARS_OFFSET    = 4 * ELEMENT_COUNT;
+val JUPITER_OFFSET = 5 * ELEMENT_COUNT;
+val SATURN_OFFSET  = 6 * ELEMENT_COUNT;
 val DISTANCE_IDX       = 0;
 val J2000_LNG_IDX      = 1;
 val J2000_LAT_IDX      = 2;
@@ -147,7 +152,10 @@ def jplDataPlanet(time: Double, planetOffset: Int): IndexedSeq[Double] = {
   }
 }
 
-
+def calcLngDiff(lng1: Double, lng2: Double): Double = {
+  val d = lng1 - lng2;
+  if (d < 0) d + pi2 else d;
+}
 
 val constellationsMap = Map (
   ( 25, 10) -> "うお座の東側の魚(アンドロメダ座の南)のしっぽ付近",
@@ -183,18 +191,19 @@ val constellationsMap = Map (
   (200,-10) -> "おとめ座スピカの北",
 );
 
-def j2000ToConstellations(lng: Double, lat: Double): String = {
+def j2000ToConstellations(lng: Double, lat: Double): (String, String) = {
   val lng5 = (lng * pi57 / 5).toInt * 5;
   val lat5 = ((lat * pi57 + 90) / 5).toInt * 5 - 90;
   val key = (lng5, lat5);
   val cons = constellationsMap.getOrElse(key, "");
   if (cons == "") {
-    println("# ERROR %d(%dh+%dm), %d".format(lng5, lng5 / 15, lng5 % 15 * 4, lat5));
+    ("#", "(%dh%02dm(%d), %d)".format(lng5 / 15, lng5 % 15 * 4, lng5, lat5));
+  } else {
+    ("", cons);
   }
-  cons;
 }
 
-def calcSun(): Unit = {
+def procSun(): Unit = {
   val sunLng360 = (0 until durationCount6).map { i =>
     val d = jplData6(i)._3(SUN_OFFSET + T_ECLIPTIC_LNG_IDX);
     d * pi57;
@@ -236,7 +245,7 @@ def calcSun(): Unit = {
   }
 }
 
-def calcMoon(): Unit = {
+def procMoon(): Unit = {
   val moonSunLng360 = (0 until durationCount6).map { i =>
     val d = jplData6(i)._3(MOON_OFFSET + T_ECLIPTIC_LNG_IDX) - jplData6(i)._3(SUN_OFFSET + T_ECLIPTIC_LNG_IDX);
     val d360 = d * pi57;
@@ -257,58 +266,66 @@ def calcMoon(): Unit = {
   }
 }
 
-def calcMars(): Unit = {
-  val marsSunLng360 = (0 until durationCount6).map { i =>
-    val d = jplData6(i)._3(MARS_OFFSET + T_ECLIPTIC_LNG_IDX) - jplData6(i)._3(SUN_OFFSET + T_ECLIPTIC_LNG_IDX);
-    val d360 = d * pi57;
-    if (d360 < 0) d360 + 360 else d360;
-  }
+procSun();
+procMoon();
 
-  val marsTermStr = IndexedSeq("合", "東矩", "衝", "西矩");
-  (1 until durationCount6).map { i =>
-    val v1 = (marsSunLng360(i-1) / 90).toInt;
-    val v2 = (marsSunLng360(i) / 90).toInt;
-    if (v1 != v2) {
-      (i, "火星が%s".format(marsTermStr(v2)));
-    } else {
-      (i, "");
+def procPlanets1(): Unit = {
+  val planets = IndexedSeq(
+    (MARS_OFFSET,    "火星"),
+    (JUPITER_OFFSET, "木星"),
+    (SATURN_OFFSET,  "土星"),
+  );
+  val termStr = IndexedSeq("合", "東矩", "衝", "西矩");
+  planets.foreach { case (offset, planetName) =>
+    val data = (0 until durationCount6).map { i =>
+      val d1 = jplDataPlanet(i * 6, SUN_OFFSET);
+      val d2 = jplDataPlanet(i * 6, offset);
+      //val d = calcLngDiff(d2(T_ECLIPTIC_LNG_IDX), d1(T_ECLIPTIC_LNG_IDX));
+      val d = calcLngDiff(d2(J2000_LNG_IDX), d1(J2000_LNG_IDX));
+      ((d * pi57 / 90).toInt, d2(J2000_LNG_IDX), d2(J2000_LAT_IDX));
     }
-  }.filter(_._2 != "").foreach { case (i, msg) =>
-    putMessage(jplData6(i)._2.minusSeconds(2700), msg);
+    (1 until durationCount6).foreach { i =>
+      if (data(i)._1 != data(i - 1)._1) {
+        val (flag, cons) = j2000ToConstellations(data(i)._2, data(i)._3);
+        val msg = "%s%sが%s。%sにいます".format(flag, planetName, termStr(data(i-1)._1), cons);
+        putMessage(jplDataTime(i * 6).minusSeconds(2700), msg);
+      }
+    }
   }
 }
 
-calcSun();
-calcMoon();
-calcMars();
-
-def calcPlanets2(): Unit = {
+def procPlanets2(): Unit = {
   val planets = IndexedSeq(
     (MOON_OFFSET, "月", List(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
       DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
-    (MARS_OFFSET, "火星", List(DayOfWeek.TUESDAY)),
+    (MARS_OFFSET,    "火星", List(DayOfWeek.TUESDAY)),
+    (JUPITER_OFFSET, "木星", List(DayOfWeek.THURSDAY)),
+    (SATURN_OFFSET,  "土星", List(DayOfWeek.SATURDAY)),
   );
   val altThres = 10 / pi57;
   (0 until durationCount24 - 1).foreach { day =>
-    val localTime = jplData(day * 144)._2;
-    val timeList = IndexedSeq(sunriseSunsetTimes(day)._2, day * 144.0 + 21 * 6, day * 144.0 + 24 * 6);
-    val data = planets.filter(_._3.contains(localTime.getDayOfWeek())).
-      map { case (offset, planetName, _) =>
+    val dayOfWeek = jplDataTime(day * 144).getDayOfWeek();
+    val timeList = IndexedSeq(sunriseSunsetTimes(day)._2, day * 144.0 + 21 * 6, day * 144.0 + 23 * 6);
+    planets.filter(_._3.contains(dayOfWeek)).
+      foreach { case (offset, planetName, _) =>
       val d = timeList.map { time =>
         val d = jplDataPlanet(time, offset);
         (d(J2000_LNG_IDX), d(J2000_LAT_IDX), d(HCS_AZI_IDX), d(HCS_ALT_IDX));
       }
       (d, planetName);
-    }
-    data.filter(d => d._1(1)._4 >= altThres).foreach { case (d, planetName) =>
-      val cons = j2000ToConstellations(d(1)._1, d(1)._2);
-      if (cons != "") {
-        val msg = "%sは%sにいます".format(planetName, cons);
-        putMessage(jplData(day * 144 + 21 * 6)._2.minusSeconds(600), msg);
+      if (d(1)._4 >= altThres) {
+        val (flag, cons) = j2000ToConstellations(d(1)._1, d(1)._2);
+        val msg = "%s%sは%sにいます".format(flag, planetName, cons);
+        putMessage(jplDataTime(day * 144 + 21 * 6).minusSeconds(600), msg);
+      } else if (d(2)._4 >= altThres && offset != MOON_OFFSET) {
+        val (flag, cons) = j2000ToConstellations(d(1)._1, d(1)._2);
+        val msg = "%s%sは%sにいます".format(flag, planetName, cons);
+        putMessage(jplDataTime(day * 144 + 23 * 6).minusSeconds(600), msg);
       }
     }
   }
 }
 
-calcPlanets2();
+procPlanets1();
+procPlanets2();
 

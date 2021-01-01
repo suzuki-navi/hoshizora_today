@@ -40,7 +40,7 @@ def calcData(time)
   mlat = $pi5 - $tokyoLat
 
   data = []
-  [:sun, :moon, :mars].each do |target|
+  [:sun, :moon, :mercury, :venus, :mars, :jupiter, :saturn].each do |target|
     xyz = calcXyz(target, ttjd)
     trueEquatorialXyz = bpn.apply_bias_prec_nut(xyz)
     trueEclipticXyz = rotationX(trueEquatorialXyz, meps)
@@ -61,6 +61,10 @@ def calcXyz(target, ttjd)
     target_id = 11
   elsif target == :moon
     target_id = 10
+  elsif target == :mercury
+    target_id = 1
+  elsif target == :venus
+    target_id = 2
   elsif target == :mars
     target_id = 4
   elsif target == :jupiter
