@@ -271,6 +271,39 @@ procMoon();
 
 def procPlanets1(): Unit = {
   val planets = IndexedSeq(
+    (MERCURY_OFFSET, "水星"),
+    (VENUS_OFFSET,   "金星"),
+  );
+  planets.foreach { case (offset, planetName) =>
+    val data = (0 until durationCount6).map { i =>
+      val d1 = jplDataPlanet(i * 6, SUN_OFFSET);
+      val d2 = jplDataPlanet(i * 6, offset);
+      calcLngDiff(d2(T_ECLIPTIC_LNG_IDX), d1(T_ECLIPTIC_LNG_IDX));
+      //calcLngDiff(d2(J2000_LNG_IDX), d1(J2000_LNG_IDX));
+    }
+    (1 until durationCount6 - 1).foreach { i =>
+      val d0 = data(i - 1);
+      val d1 = data(i    );
+      val d2 = data(i + 1);
+      if (d0 > pi && d1 < pi) {
+        val msg = "%sが外合(黄経基準)".format(planetName);
+        putMessage(jplDataTime(i * 6).minusSeconds(2700), msg);
+      } else if (d0 < pi && d1 > pi) {
+        val msg = "%sが内合(黄経基準)".format(planetName);
+        putMessage(jplDataTime(i * 6).minusSeconds(2700), msg);
+      } else if (d0 < pi && d1 < pi && d2 < pi && d1 > d0 && d1 >= d2) {
+        val msg = "%sが東方最大離角(黄経基準)".format(planetName);
+        putMessage(jplDataTime(i * 6).minusSeconds(900), msg);
+      } else if (d0 > pi && d1 > pi && d2 > pi && d1 < d0 && d1 <= d2) {
+        val msg = "%sが西方最大離角(黄経基準)".format(planetName);
+        putMessage(jplDataTime(i * 6).minusSeconds(900), msg);
+      }
+    }
+  }
+}
+
+def procPlanets2(): Unit = {
+  val planets = IndexedSeq(
     (MARS_OFFSET,    "火星"),
     (JUPITER_OFFSET, "木星"),
     (SATURN_OFFSET,  "土星"),
@@ -286,15 +319,78 @@ def procPlanets1(): Unit = {
     }
     (1 until durationCount6).foreach { i =>
       if (data(i)._1 != data(i - 1)._1) {
-        val (flag, cons) = j2000ToConstellations(data(i)._2, data(i)._3);
-        val msg = "%s%sが%s。%sにいます".format(flag, planetName, termStr(data(i-1)._1), cons);
+        val v = data(i-1)._1;
+        val msg = if (v == 0) {
+          "%sが%s(赤経基準)".format(planetName, termStr(v));
+        } else {
+          val (flag, cons) = j2000ToConstellations(data(i)._2, data(i)._3);
+          "%s%sが%s(赤経基準)。%sにいます".format(flag, planetName, termStr(v), cons);
+        }
         putMessage(jplDataTime(i * 6).minusSeconds(2700), msg);
       }
     }
   }
 }
 
-def procPlanets2(): Unit = {
+def procPlanets3(): Unit = {
+  val planets = IndexedSeq(
+    (MERCURY_OFFSET, "水星"),
+    (VENUS_OFFSET,   "金星"),
+  );
+  val data = planets.map { case (planetOffset, _) =>
+    (0 until durationCount24).map { day =>
+      val time = sunriseSunsetTimes(day)._2;
+      val d = jplDataPlanet(time, planetOffset);
+      d(HCS_ALT_IDX);
+    }
+  }
+  (planets zip data).foreach { case ((_, planetName), data) =>
+    (1 until durationCount24 - 1).flatMap { day =>
+      val d0 = data(day - 1);
+      val d1 = data(day    );
+      val d2 = data(day + 1);
+      if (d1 > d0 && d1 >= d2) {
+        val alt = (d1 * pi57 + 0.5).toInt;
+        Some((sunriseSunsetTimes(day)._2, "%sが日没時最大高度で約%d°".format(planetName, alt)));
+      } else {
+        None;
+      }
+    }.foreach { case (time, msg) =>
+      val time2 = (time * 2).toInt * 0.5;
+      putMessage(jplDataTime(time2), msg);
+    }
+  }
+}
+
+def procPlanets4(): Unit = {
+  val planets = IndexedSeq(
+    (MERCURY_OFFSET, "水星", List(DayOfWeek.WEDNESDAY)),
+    (VENUS_OFFSET,   "金星", List(DayOfWeek.FRIDAY)),
+  );
+  val altThres = 10 / pi57;
+  (1 until durationCount24).foreach { day =>
+    val dayOfWeek = jplDataTime(day * 144).getDayOfWeek();
+    val time = sunriseSunsetTimes(day)._2;
+    val timePrev = sunriseSunsetTimes(day - 1)._2;
+    planets.filter(_._3.contains(dayOfWeek)).
+      foreach { case (offset, planetName, _) =>
+      val d0 = jplDataPlanet(timePrev, offset)(HCS_ALT_IDX);
+      val d1 = jplDataPlanet(time, offset)(HCS_ALT_IDX);
+      if (d1 >= altThres) {
+        val alt = (d1 * pi57 + 0.5).toInt;
+        val msg = if (d1 > d0) {
+          "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt);
+        } else {
+          "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt);
+        }
+        val time2 = (time * 2).toInt * 0.5;
+        putMessage(jplDataTime(time2), msg);
+      }
+    }
+  }
+}
+
+def procPlanets5(): Unit = {
   val planets = IndexedSeq(
     (MOON_OFFSET, "月", List(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
       DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)),
@@ -305,7 +401,7 @@ def procPlanets2(): Unit = {
   val altThres = 10 / pi57;
   (0 until durationCount24 - 1).foreach { day =>
     val dayOfWeek = jplDataTime(day * 144).getDayOfWeek();
-    val timeList = IndexedSeq(sunriseSunsetTimes(day)._2, day * 144.0 + 21 * 6, day * 144.0 + 23 * 6);
+    val timeList = IndexedSeq(day * 144 + 21 * 6, day * 144 + 23 * 6);
     planets.filter(_._3.contains(dayOfWeek)).
       foreach { case (offset, planetName, _) =>
       val d = timeList.map { time =>
@@ -313,11 +409,11 @@ def procPlanets2(): Unit = {
         (d(J2000_LNG_IDX), d(J2000_LAT_IDX), d(HCS_AZI_IDX), d(HCS_ALT_IDX));
       }
       (d, planetName);
-      if (d(1)._4 >= altThres) {
-        val (flag, cons) = j2000ToConstellations(d(1)._1, d(1)._2);
+      if (d(0)._4 >= altThres) {
+        val (flag, cons) = j2000ToConstellations(d(0)._1, d(0)._2);
         val msg = "%s%sは%sにいます".format(flag, planetName, cons);
         putMessage(jplDataTime(day * 144 + 21 * 6).minusSeconds(600), msg);
-      } else if (d(2)._4 >= altThres && offset != MOON_OFFSET) {
+      } else if (d(1)._4 >= altThres && offset != MOON_OFFSET) {
         val (flag, cons) = j2000ToConstellations(d(1)._1, d(1)._2);
         val msg = "%s%sは%sにいます".format(flag, planetName, cons);
         putMessage(jplDataTime(day * 144 + 23 * 6).minusSeconds(600), msg);
@@ -328,4 +424,7 @@ def procPlanets2(): Unit = {
 
 procPlanets1();
 procPlanets2();
+procPlanets3();
+procPlanets4();
+procPlanets5();
 

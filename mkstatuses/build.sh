@@ -8,5 +8,5 @@ cd $(dirname $0)
 
 echo "start mkstatuses..."
 
-scala ./main.scala $start $end | tee ../var/statuses.txt
+scala ./main.scala $start $end >| ../var/statuses.txt
 
