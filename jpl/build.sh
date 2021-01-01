@@ -13,7 +13,17 @@ if [[ ! -e ../var/ssd.jpl.nasa.gov ]]; then
     )
 fi
 
-bundle exec ruby ./main.rb $start $end
+(
+    echo $start
+    echo $end2
+) >| ../var/jpl.period.txt.new
 
-mv ../var/planets.dat.new ../var/planets.dat
+if [[ -e ../var/jpl.period.txt ]] && cmp ../var/jpl.period.txt ../var/jpl.period.txt.new >/dev/null; then
+    exit 0
+fi
+
+bundle exec ruby ./main.rb $start $end2
+
+mv ../var/jpl.dat.new ../var/jpl.dat
+mv ../var/jpl.period.txt.new ../var/jpl.period.txt
 

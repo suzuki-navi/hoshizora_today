@@ -5,7 +5,7 @@ require 'eph_jpl'
 require 'mk_greenwich'
 
 $jpl_data_path = '../var/ssd.jpl.nasa.gov/pub/eph/planets/Linux/de430/linux_p1550p2650.430'
-$planets_data_path = '../var/planets.dat.new'
+$planets_data_path = '../var/jpl.dat.new'
 
 $pi2 = 2.0 * Math::PI
 $pi5 = 0.5 * Math::PI
