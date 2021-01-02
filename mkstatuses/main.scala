@@ -419,22 +419,62 @@ def procSun4(): Unit = {
 
 def procMoon(): Unit = {
   val moonSunLng360 = (0 until durationCount6).map { i =>
-    val d = jplData6(i)._3(MOON_OFFSET + T_ECLIPTIC_LNG_IDX) - jplData6(i)._3(SUN_OFFSET + T_ECLIPTIC_LNG_IDX);
+    val d = jplDataPlanet(i * 6, MOON_OFFSET)(T_ECLIPTIC_LNG_IDX) - jplDataPlanet(i * 6, SUN_OFFSET)(T_ECLIPTIC_LNG_IDX);
     val d360 = d * pi57;
     if (d360 < 0) d360 + 360 else d360;
   }
-
   val moonTermStr = IndexedSeq("新月", "上弦の月", "満月", "下弦の月");
+
+  val fullMoonDistanceData: (Map[Int, Int], IndexedSeq[Double]) = {
+    val moonSunLng = (0 until durationCount).map { i =>
+      val d1 = jplDataPlanet(i, MOON_OFFSET)(T_ECLIPTIC_LNG_IDX);
+      val d0 = jplDataPlanet(i, SUN_OFFSET)(T_ECLIPTIC_LNG_IDX);
+      calcLngDiff(d1, d0);
+    }
+    val timeDistance = (1 until durationCount).flatMap { i =>
+      if (moonSunLng(i) >= pi && moonSunLng(i - 1) < pi) {
+        val time = i.toDouble - 1.0 + (pi - moonSunLng(i - 1)) / (moonSunLng(i) - moonSunLng(i - 1));
+        val distance = jplDataPlanet(time, MOON_OFFSET)(DISTANCE_IDX);
+        Some((time, distance));
+      } else {
+        None;
+      }
+    }
+    val data1 = timeDistance.zipWithIndex.map { case ((time, _), idx) =>
+      ((time / 6).toInt, idx);
+    }.toMap;
+    val data2 = timeDistance.map(_._2);
+    (data1, data2);
+  }
+
   (1 until durationCount6).map { i =>
     val v1 = (moonSunLng360(i-1) / 90).toInt;
     val v2 = (moonSunLng360(i) / 90).toInt;
     if (v1 != v2) {
-      (i, moonTermStr(v2));
+      if (v2 == 2) {
+        val idx = fullMoonDistanceData._1.getOrElse(i - 1, 0);
+        if (idx >= 1 && idx < fullMoonDistanceData._2.size - 1) {
+          val d0 = fullMoonDistanceData._2(idx - 1);
+          val d1 = fullMoonDistanceData._2(idx    );
+          val d2 = fullMoonDistanceData._2(idx + 1);
+          if (d1 < d0 && d1 <= d2) {
+            (i * 6, "満月。月が地球に近いため、もっとも大きい満月です");
+          } else if (d1 > d0 && d1 >= d2) {
+            (i * 6, "満月。月が地球に遠いため、もっとも小さい満月です");
+          } else {
+            (i * 6, moonTermStr(v2));
+          }
+        } else {
+          (i * 6, moonTermStr(v2));
+        }
+      } else {
+        (i * 6, moonTermStr(v2));
+      }
     } else {
-      (i, "");
+      (i * 6, "");
     }
   }.filter(_._2 != "").foreach { case (i, msg) =>
-    putMessage(jplData6(i)._2.minusSeconds(2700), msg);
+    putMessage(jplDataTime(i).minusSeconds(2700), msg);
   }
 }
 
