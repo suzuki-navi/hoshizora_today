@@ -332,7 +332,7 @@ def j2000ToConstellations(lng: Double, lat: Double): (String, String) = {
   }
 }
 
-def procSun(): Unit = {
+def procSun1(): Unit = {
   val sunLng360 = (0 until durationCount6).map { i =>
     val d = jplData6(i)._3(SUN_OFFSET + T_ECLIPTIC_LNG_IDX);
     d * pi57;
@@ -357,7 +357,9 @@ def procSun(): Unit = {
   }.filter(_._2 != "").foreach { case (i, msg) =>
     putMessage(jplData6(i)._2.minusSeconds(2700), msg);
   }
+}
 
+def procSun2(): Unit = {
   (1 until durationCount6 - 1).map { i =>
     val d0 = jplData6(i - 1)._3(SUN_OFFSET + DISTANCE_IDX);
     val d1 = jplData6(i    )._3(SUN_OFFSET + DISTANCE_IDX);
@@ -371,6 +373,47 @@ def procSun(): Unit = {
     }
   }.filter(_._2 != "").foreach { case (i, msg) =>
     putMessage(jplData6(i)._2.minusSeconds(900), msg);
+  }
+}
+
+def procSun3(): Unit = {
+  (1 until durationCount24 - 1).flatMap { day =>
+    val dayOfWeek = jplDataTime(day * 144).getDayOfWeek();
+    val d0 = sunriseSunsetTimes(day - 1)._2 - (day - 1) * 144;
+    val d1 = sunriseSunsetTimes(day    )._2 - (day    ) * 144;
+    val d2 = sunriseSunsetTimes(day + 1)._2 - (day + 1) * 144;
+    if (d1 < d0 && d1 <= d2) {
+      val time = jplDataTime(d1 + day * 144);
+      val hour = time.getHour();
+      val minute = time.getMinute();
+      Some((time, "日没が最も早く、%d時%02d分ごろです".format(hour, minute)));
+    } else if (d1 > d0 && d1 >= d2) {
+      val time = jplDataTime(d1 + day * 144);
+      val hour = time.getHour();
+      val minute = time.getMinute();
+      Some((time, "日没が最も遅く、%d時%02d分ごろです".format(hour, minute)));
+    } else {
+      None;
+    }
+  }.foreach { case (time, msg) =>
+    putMessage(time.minusSeconds(600), msg);
+  }
+}
+
+def procSun4(): Unit = {
+  (0 until durationCount24).flatMap { day =>
+    val dayOfWeek = jplDataTime(day * 144).getDayOfWeek();
+    if (dayOfWeek == DayOfWeek.SUNDAY) {
+      val time = jplDataTime(sunriseSunsetTimes(day)._2);
+      val hour = time.getHour();
+      val minute = time.getMinute();
+      val msg = "日没は%d時%02d分ごろ".format(hour, minute);
+      Some((time, msg));
+    } else {
+      None;
+    }
+  }.foreach { case (time, msg) =>
+    putMessage(time.minusSeconds(600), msg);
   }
 }
 
@@ -394,9 +437,6 @@ def procMoon(): Unit = {
     putMessage(jplData6(i)._2.minusSeconds(2700), msg);
   }
 }
-
-procSun();
-procMoon();
 
 def procPlanets1(): Unit = {
   val planets = IndexedSeq(
@@ -550,6 +590,12 @@ def procPlanets5(): Unit = {
     }
   }
 }
+
+procSun1();
+procSun2();
+procSun3();
+procSun4();
+procMoon();
 
 procPlanets1();
 procPlanets2();
