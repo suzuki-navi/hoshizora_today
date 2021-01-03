@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 const sourceLines = fs.readFileSync("/dev/stdin", 'utf8').split("\n");
-const patchLines = fs.readFileSync("diff.txt", 'utf8').split("\n");
+const patchLines = fs.readFileSync("../var/diff.txt", 'utf8').split("\n");
 
 var is = 0;
 var ip = 0;
