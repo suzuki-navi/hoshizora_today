@@ -617,15 +617,15 @@ def procPlanets5(): Unit = {
         val d = jplDataPlanet(time, offset);
         (d(J2000_LNG_IDX), d(J2000_LAT_IDX), d(HCS_AZI_IDX), d(HCS_ALT_IDX));
       }
-      (d, planetName);
+      val timeDelta = if (offset == MOON_OFFSET) 600 else 900;
       if (d(0)._4 >= altThres) {
         val (flag, cons) = j2000ToConstellations(d(0)._1, d(0)._2);
         val msg = "%s%sは%sにいます".format(flag, planetName, cons);
-        putMessage(jplDataTime(day * 144 + 21 * 6).minusSeconds(600), msg);
+        putMessage(jplDataTime(day * 144 + 21 * 6).minusSeconds(timeDelta), msg);
       } else if (d(1)._4 >= altThres && offset != MOON_OFFSET) {
         val (flag, cons) = j2000ToConstellations(d(1)._1, d(1)._2);
         val msg = "%s%sは%sにいます".format(flag, planetName, cons);
-        putMessage(jplDataTime(day * 144 + 23 * 6).minusSeconds(600), msg);
+        putMessage(jplDataTime(day * 144 + 23 * 6).minusSeconds(timeDelta), msg);
       }
     }
   }
