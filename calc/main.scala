@@ -1471,12 +1471,17 @@ sunDistanceEventList.foreach { case (time, flag) =>
 
 {
   val termStrs = IndexedSeq(
-    "新月", "月相 1/8。新月と上弦の中間です。", "上弦の月", "月相 3/8。上弦と満月の中間です。", "満月", "月相 5/8。満月と下弦の中間です。", "下弦の月", "月相 7/8。下弦と新月の中間です。",
+    "新月",
+    "月相 1/8。新月と上弦の中間です",
+    "上弦の月",
+    "月相 3/8。上弦と満月の中間です",
+    "満月",
+    "月相 5/8。満月と下弦の中間です",
+    "下弦の月",
+    "月相 7/8。下弦と新月の中間です",
   );
   moonPhaseTerms.foreach { case (time, term) =>
-    if (term % 2 == 0) {
-      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), termStrs(term));
-    }
+    putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), termStrs(term));
   }
 }
 

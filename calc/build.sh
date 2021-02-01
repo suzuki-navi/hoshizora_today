@@ -4,7 +4,7 @@ set -o pipefail
 
 cd $(dirname $0)
 
-. ../period.sh
+. ./period.sh
 
 echo "started calculating..."
 
