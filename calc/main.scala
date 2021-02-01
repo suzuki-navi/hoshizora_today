@@ -1183,8 +1183,8 @@ val moonPhaseTerms: List[(Double, Int)] = {
   moonPhaseTerms;
 }
 
-val planetPhase: List[(Double, String, String, Boolean, Option[(String, String)])] = {
-  var planetPhase: List[(Double, String, String, Boolean, Option[(String, String)])] = Nil;
+val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] = {
+  var planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] = Nil;
   def calcInnerPlanetLngEc(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
@@ -1264,15 +1264,14 @@ val planetPhase: List[(Double, String, String, Boolean, Option[(String, String)]
       val utc = time;
       val tdb = TimeLib.mjdutcToTdb(utc);
       val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-      val (flag, cons) = Constellations.icrsToConstellation(xyz);
       if (term == 0) {
         planetPhase = (time, planetName, "合(赤経基準)", false, None) :: planetPhase;
       } else if (term == 1) {
-        planetPhase = (time, planetName, "西矩(赤経基準)", false, Some((flag, cons))) :: planetPhase;
+        planetPhase = (time, planetName, "西矩(赤経基準)", false, Some(xyz)) :: planetPhase;
       } else if (term == 2) {
-        planetPhase = (time, planetName, "衝(赤経基準)", false, Some((flag, cons))) :: planetPhase;
+        planetPhase = (time, planetName, "衝(赤経基準)", false, Some(xyz)) :: planetPhase;
       } else if (term == 3) {
-        planetPhase = (time, planetName, "東矩(赤経基準)", false, Some((flag, cons))) :: planetPhase;
+        planetPhase = (time, planetName, "東矩(赤経基準)", false, Some(xyz)) :: planetPhase;
       }
     }
   }
@@ -1380,9 +1379,9 @@ val sunsetPlanet: List[(Double, String, Double, Boolean, Boolean)] = {
 }
 
 // 21時・23時の惑星
-val (moonCons: List[(Double, String, String)], planetCons: List[(Double, String, String, String)]) = {
-  var moonCons: List[(Double, String, String)] = Nil;
-  var planetCons: List[(Double, String, String, String)] = Nil;
+val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, Array[Double])]) = {
+  var moonCons: List[(Double, Array[Double])] = Nil;
+  var planetCons: List[(Double, String, Array[Double])] = Nil;
   val altThres = 10 / PI57;
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0;
@@ -1395,8 +1394,7 @@ val (moonCons: List[(Double, String, String)], planetCons: List[(Double, String,
       val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(moon2, ut1);
       if (alt >= altThres) {
-        val (flag, cons) = Constellations.icrsToConstellation(moon);
-        moonCons = (time, flag, cons) :: moonCons;
+        moonCons = (time, moon) :: moonCons;
       }
     }
     val (planetName, targetPlanet) = if (wday == 2) {
@@ -1415,8 +1413,7 @@ val (moonCons: List[(Double, String, String)], planetCons: List[(Double, String,
         val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
         val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(planet2, ut1);
         if (alt >= altThres) {
-          val (flag, cons) = Constellations.icrsToConstellation(planet);
-          planetCons = (time, flag, planetName, cons) :: planetCons;
+          planetCons = (time, planetName, planet) :: planetCons;
         } else {
           val time = startTime + d + 23.0 / 24.0;
           val ut1 = time; // 近似的
@@ -1426,8 +1423,7 @@ val (moonCons: List[(Double, String, String)], planetCons: List[(Double, String,
           val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
           val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(planet2, ut1);
           if (alt >= altThres) {
-            val (flag, cons) = Constellations.icrsToConstellation(planet);
-            planetCons = (time, flag, planetName, cons) :: planetCons;
+            planetCons = (time, planetName, planet) :: planetCons;
           }
         }
     }
@@ -1484,17 +1480,18 @@ sunDistanceEventList.foreach { case (time, flag) =>
   }
 }
 
-planetPhase.foreach { case (time, planetName, content, timeFlag, consOpt) =>
+planetPhase.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
   val time2 = if (timeFlag) {
     TimeLib.round(time, 24) - 1.0 / (24 * 4);
   } else {
     TimeLib.floor(time, 24) + 1.0 / (24 * 4);
   }
-  consOpt match {
+  xyzOpt match {
   case None =>
     putTweet(time2, "%sが%s".format(planetName, content));
-  case Some((flag, cons)) =>
-    putTweet(time2, "%s%sが%s。%sにいます".format(flag, planetName, content, cons));
+  case Some(xyz) =>
+    val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
+    putTweet(time2, "%s%sが%s。%sにいます".format(conscomment, planetName, content, cons));
   }
 }
 
@@ -1510,11 +1507,13 @@ sunsetPlanet.foreach { case (time, planetName, alt, isIncreasing, isMax) =>
   putTweet(TimeLib.floor(time, 24 * 12), msg);
 }
 
-moonCons.foreach { case (time, flag, cons) =>
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 6), "%s月は%sにいます".format(flag, cons));
+moonCons.foreach { case (time, xyz) =>
+  val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
+  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 6), "%s月は%sにいます".format(conscomment, cons));
 }
-planetCons.foreach { case (time, flag, planetName, cons) =>
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます".format(flag, planetName, cons));
+planetCons.foreach { case (time, planetName, xyz) =>
+  val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
+  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます".format(conscomment, planetName, cons));
 }
 
 //==============================================================================
