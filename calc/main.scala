@@ -1446,7 +1446,7 @@ def putTweet(time: Double, msg: String): Unit = {
 (0 until period).foreach { d =>
   val t = sunsetTimes(d);
   if (TimeLib.wday(t) == 0) {
-    putTweet(t - 1.0 / 144, "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(t)));
+    putTweet(t, "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(t)));
   }
 }
 
