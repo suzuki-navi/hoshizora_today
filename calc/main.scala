@@ -1093,7 +1093,7 @@ def calcSunsetTimes(): IndexedSeq[Double] = {
   }
 }
 
-def calcMoonPhaseTerms(): IndexedSeq[(Double, Int)] = {
+def calcMoonPhaseTerms(): IndexedSeq[(Double, Int, Double)] = {
   def calcMoonPhase(time: Double): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
@@ -1106,18 +1106,26 @@ def calcMoonPhaseTerms(): IndexedSeq[(Double, Int)] = {
     val moonLng = VectorLib.xyzToLng(moon2);
     VectorLib.calcLngDiff(moonLng, sunLng);
   }
-  var moonPhaseTerms: List[(Double, Int)] = Nil;
+  def calcMoonDistance(time: Double): Double = {
+    val utc = time;
+    val tdb = TimeLib.mjdutcToTdb(utc);
+    val sun = jplData.calcSunFromEarth(tdb);
+    val moon = jplData.calcMoonFromEarth(tdb);
+    VectorLib.distance(moon);
+  }
+  var moonPhaseTerms: List[(Double, Int, Double)] = Nil;
   var currTerm: Int = (calcMoonPhase(startTime) * 8 / PI2).toInt;
-  var nextStartTime: Double = startTime;
+  var nextStartTime: Double = startTime - 30.0;
   var nextRange: Int = 5;
-  while (nextStartTime >= 0.0 && nextStartTime < endTime) {
+  while (nextStartTime >= 0.0 && nextStartTime < endTime + 30.0) {
     val nextTerm = if (currTerm == 7) 0 else currTerm + 1;
     val nextTime = Lib.findCrossingBoundaryTime(nextTerm.toDouble * PI2 / 8, false, true,
       nextStartTime, 24, nextRange * 24) { time =>
       calcMoonPhase(time);
     }
     if (nextTime >= 0.0) {
-      moonPhaseTerms = (nextTime, nextTerm) :: moonPhaseTerms;
+      val distance = calcMoonDistance(nextTime);
+      moonPhaseTerms = (nextTime, nextTerm, distance) :: moonPhaseTerms;
       currTerm = nextTerm;
       nextStartTime = TimeLib.floor(nextTime, 1) + 3.0;
       nextRange = 3;
@@ -1129,7 +1137,7 @@ def calcMoonPhaseTerms(): IndexedSeq[(Double, Int)] = {
 }
 
 val sunsetTimes: IndexedSeq[Double] = calcSunsetTimes();
-val moonPhaseTerms: IndexedSeq[(Double, Int)] = calcMoonPhaseTerms();
+val moonPhaseTerms: IndexedSeq[(Double, Int, Double)] = calcMoonPhaseTerms();
 
 sealed trait TweetContent {
   def time: Double;
@@ -1223,8 +1231,28 @@ def putTweet(tc: TweetContent): Unit = {
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = termStrs(term);
   }
-  moonPhaseTerms.foreach { case (time, term) =>
-    putTweet(MoonPhaseTermTweetContent(time, term));
+  case class FullMoonDistanceTweetContent(rawTime: Double, flag: Boolean) extends TweetContent {
+    // true: 近い, false: 遠い
+    def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
+    def message: String = if (flag) {
+      "満月。月が地球に近く、もっとも大きい満月です";
+    } else {
+      "満月。月が地球から遠く、もっとも小さい満月です";
+    }
+  }
+  (8 until (moonPhaseTerms.size - 8)).foreach { i =>
+    val (time, term, distance) = moonPhaseTerms(i);
+    putTweet(if (term == 4) {
+      if (moonPhaseTerms(i - 8)._3 <= distance && distance > moonPhaseTerms(i + 8)._3) {
+        FullMoonDistanceTweetContent(time, false);
+      } else if (moonPhaseTerms(i - 8)._3 >= distance && distance < moonPhaseTerms(i + 8)._3) {
+        FullMoonDistanceTweetContent(time, true);
+      } else {
+        MoonPhaseTermTweetContent(time, term);
+      }
+    } else {
+      MoonPhaseTermTweetContent(time, term);
+    });
   }
 }
 
