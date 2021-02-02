@@ -227,7 +227,7 @@ object TimeLib {
   }
 
   def wday(time: Double): Int = {
-    val wday1 = (time + 9.0 / 24.0).toInt % 7;
+    val wday1 = (time + (9.0 / 24.0 + 0.5 / 86400.0)).toInt % 7;
     if (wday1 >= 4) {
       wday1 - 4;
     } else {
@@ -1075,7 +1075,7 @@ val hcs = new Hcs(tokyoLng, tokyoLat);
 // イベント計算
 //==============================================================================
 
-val sunsetTimes: IndexedSeq[Double] = {
+def calcSunsetTimes(): IndexedSeq[Double] = {
   val altHor = -0.90 / PI57;
   (0 until period).map { d =>
     Lib.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
@@ -1087,6 +1087,76 @@ val sunsetTimes: IndexedSeq[Double] = {
       val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(sun2, ut1);
       alt;
+    }
+  }
+}
+
+val sunsetTimes: IndexedSeq[Double] = calcSunsetTimes();
+
+sealed trait TweetContent {
+  def time: Double;
+  def message: String;
+}
+
+var tweetContents: List[TweetContent] = Nil;
+
+sealed trait OnSunsetTweetContent extends TweetContent {
+  def day: Int;
+  def message: String;
+
+  def time: Double = sunsetTimes(day);
+}
+
+case class SunsetTweetContent(day: Int) extends OnSunsetTweetContent {
+  def message: String = "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+}
+
+(0 until period).foreach { d =>
+  if (TimeLib.wday(startTime + d) == 0) {
+    tweetContents = SunsetTweetContent(d) :: tweetContents;
+  }
+}
+
+// 日没時の西の空
+{
+  case class SunsetPlanetTweetContent(day: Int, planetName: String,
+    alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
+    def alt360: Int = (alt * PI57 + 0.5).toInt;
+    def message: String = if (isMax) {
+      "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
+    } else if (isIncreasing) {
+      "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
+    } else {
+      "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+    }
+  }
+  val altThres = 10 / PI57;
+  val planets = IndexedSeq(("水星", JplData.Mercury, 3), ("金星", JplData.Venus, 5));
+  var altData = (0 until period).map { d =>
+    val time = sunsetTimes(d);
+    val ut1 = time; // 近似的
+    val tdb = TimeLib.mjdutcToTdb(time);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    (0 until planets.size).map { i =>
+      val p = jplData.calcPlanetFromEarth(tdb, planets(i)._2);
+      val p2 = VectorLib.multiplyMV(bpnMatrix, p);
+      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(p2, ut1);
+      alt;
+    }
+  }
+  (0 until planets.size).map { i =>
+    (1 until (period-1)).foreach { d =>
+      val time = sunsetTimes(d);
+      val wday = TimeLib.wday(time);
+      if (altData(d)(i) >= altData(d-1)(i) && altData(d)(i) > altData(d+1)(i)) {
+        tweetContents = SunsetPlanetTweetContent(d, planets(i)._1, altData(d)(i), true, true) :: tweetContents;
+      } else if (wday == planets(i)._3 && altData(d)(i) >= altThres) {
+        if (altData(d)(i) >= altData(d-1)(i)) {
+          tweetContents = SunsetPlanetTweetContent(d, planets(i)._1, altData(d)(i), true, false) :: tweetContents;
+        } else {
+          tweetContents = SunsetPlanetTweetContent(d, planets(i)._1, altData(d)(i), false, false) :: tweetContents;
+        }
+      }
     }
   }
 }
@@ -1343,41 +1413,6 @@ val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] 
   planetPhase;
 }
 
-// 日没時の西の空
-val sunsetPlanet: List[(Double, String, Double, Boolean, Boolean)] = {
-  val altThres = 10 / PI57;
-  val planets = IndexedSeq(("水星", JplData.Mercury, 3), ("金星", JplData.Venus, 5));
-  var altData = (0 until period).map { d =>
-    val time = sunsetTimes(d);
-    val ut1 = time; // 近似的
-    val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    (0 until planets.size).map { i =>
-      val p = jplData.calcPlanetFromEarth(tdb, planets(i)._2);
-      val p2 = VectorLib.multiplyMV(bpnMatrix, p);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(p2, ut1);
-      alt;
-    }
-  }
-  var sunsetPlanet: List[(Double, String, Double, Boolean, Boolean)] = Nil;
-  (0 until planets.size).map { i =>
-    (1 until (period-1)).foreach { d =>
-      val time = sunsetTimes(d);
-      val wday = TimeLib.wday(time);
-      if (altData(d)(i) >= altData(d-1)(i) && altData(d)(i) > altData(d+1)(i)) {
-        sunsetPlanet = (time, planets(i)._1, altData(d)(i), true, true) :: sunsetPlanet;
-      } else if (wday == planets(i)._3 && altData(d)(i) >= altThres) {
-        if (altData(d)(i) >= altData(d-1)(i)) {
-          sunsetPlanet = (time, planets(i)._1, altData(d)(i), true, false) :: sunsetPlanet;
-        } else {
-          sunsetPlanet = (time, planets(i)._1, altData(d)(i), false, false) :: sunsetPlanet;
-        }
-      }
-    }
-  }
-  sunsetPlanet;
-}
-
 // 21時・23時の惑星
 val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, Array[Double])]) = {
   var moonCons: List[(Double, Array[Double])] = Nil;
@@ -1443,11 +1478,8 @@ def putTweet(time: Double, msg: String): Unit = {
   tweets = tweets.updated(date, (time, msg) :: list);
 }
 
-(0 until period).foreach { d =>
-  val t = sunsetTimes(d);
-  if (TimeLib.wday(t) == 0) {
-    putTweet(t, "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(t)));
-  }
+tweetContents.foreach { tc =>
+  putTweet(tc.time, tc.message);
 }
 
 sunDistanceEventList.foreach { case (time, flag) =>
@@ -1498,18 +1530,6 @@ planetPhase.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
     val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
     putTweet(time2, "%s%sが%s。%sにいます".format(conscomment, planetName, content, cons));
   }
-}
-
-sunsetPlanet.foreach { case (time, planetName, alt, isIncreasing, isMax) =>
-  val alt360 = (alt * PI57 + 0.5).toInt;
-  val msg = if (isMax) {
-    "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
-  } else if (isIncreasing) {
-    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-  } else {
-    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
-  }
-  putTweet(TimeLib.floor(time, 24 * 12), msg);
 }
 
 moonCons.foreach { case (time, xyz) =>
