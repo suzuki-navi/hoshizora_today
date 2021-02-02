@@ -6,11 +6,11 @@ cd $(dirname $0)
 
 . ./period.sh
 
-echo "started calculating..."
+echo "Starting calculating..."
 
 scala ./main.scala $start $end >| ../var/statuses.txt
 
-echo "finished calculating..."
+echo "Finished calculating..."
 
 cat diff.txt | grep '^20' | LC_ALL=C sort >| ../var/diff.txt
 
