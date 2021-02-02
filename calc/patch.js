@@ -3,6 +3,9 @@ const fs = require('fs');
 const sourceLines = fs.readFileSync("/dev/stdin", 'utf8').split("\n");
 const patchLines = fs.readFileSync("../var/diff.txt", 'utf8').split("\n");
 
+const startTime = process.argv[2];
+const endTime = process.argv[3];
+
 var is = 0;
 var ip = 0;
 var removeTime = "";
@@ -30,7 +33,9 @@ while (true) {
                 }
             }
             if (!f) {
-                console.log(sourceLine);
+                if (sourceTime >= startTime && sourceTime < endTime) {
+                    console.log(sourceLine);
+                }
             }
             removeBodyList = removeBodyList2;
             if (removeBodyList.length == 0) {
@@ -39,18 +44,24 @@ while (true) {
         } else {
             if (removeTime != "") {
                 for (const el of removeBodyList) {
-                    console.log(removeTime + " #-" + el);
+                    if (removeTime >= startTime && removeTime < endTime) {
+                        console.log(removeTime + " #-" + el);
+                    }
                 }
                 removeTime = "";
                 removeBodyList = [];
             }
-            console.log(sourceLine);
+            if (sourceTime >= startTime && sourceTime < endTime) {
+                console.log(sourceLine);
+            }
         }
         is++;
         continue;
     }
     if (patchBody.startsWith("+")) {
-        console.log(patchTime + " " + patchBody.substring(1));
+        if (patchTime >= startTime && patchTime < endTime) {
+            console.log(patchTime + " " + patchBody.substring(1));
+        }
         ip++;
         continue;
     }

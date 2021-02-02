@@ -14,7 +14,7 @@ echo "finished calculating..."
 
 cat diff.txt | grep '^20' | LC_ALL=C sort >| ../var/diff.txt
 
-cat ../var/statuses.txt | node patch.js >| ../var/data.txt
+cat ../var/statuses.txt | node patch.js $start $end >| ../var/data.txt
 
 mv ../var/data.txt ../data.txt
 
