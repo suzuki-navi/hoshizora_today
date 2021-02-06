@@ -1215,6 +1215,37 @@ def putTweet(tc: TweetContent): Unit = {
   }
 }
 
+{
+  case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent {
+    def azi360: Int = (azi * PI57 + 0.5).toInt;
+    def alt360: Int = (alt * PI57 + 0.5).toInt;
+    def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
+  }
+  val altThres = 10 / PI57;
+  (8 until (moonPhaseTerms.size - 8)).foreach { i =>
+    val (moonPhaseTime, term, distance) = moonPhaseTerms(i);
+    if (term == 0) {
+      ((0 until 4).flatMap { d =>
+        val day = (moonPhaseTime + d - startTime).toInt;
+        val time = sunsetTimes(day);
+        val ut1 = time; // 近似的
+        val tdb = TimeLib.mjdutcToTdb(time);
+        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+        val moon = jplData.calcMoonFromEarth(tdb);
+        val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
+        val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(moon2, ut1);
+        if (alt >= altThres) {
+          Some(SunsetMoonTweetContent(day, azi, alt));
+        } else {
+          None;
+        }
+      }).take(1).foreach { tw =>
+        putTweet(tw);
+      }
+    }
+  }
+}
+
 // 月相
 {
   val termStrs = IndexedSeq(
