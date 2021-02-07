@@ -711,11 +711,20 @@ object Bpn {
 
 class Hcs(lng: Double, lat: Double) {
 
-  def trueEquatorialXyzToAziAlt(xyz: Array[Double], ut1Time: Double): (Double, Double) = {
+  def siderealTime(ut1Time: Double): Double = {
     val gmst = TimeLib.mjdut1ToGmst(ut1Time);
     val gast = gmst; // 近似
+    val s = gast + lng;
+    if (s >= PI2) {
+      s - PI2;
+    } else {
+      s;
+    }
+  }
+
+  def trueEquatorialXyzToAziAlt(xyz: Array[Double], ut1Time: Double): (Double, Double) = {
     var r: Array[Double] = VectorLib.unitMatrix;
-    r = VectorLib.rotateMatrixZ(PI5 - gast - lng, r);
+    r = VectorLib.rotateMatrixZ(PI5 - siderealTime(ut1Time), r);
     r = VectorLib.rotateMatrixX(PI5 - lat, r);
     // 地平座標系 X:西 Y:南 Z:天頂
     val hcs = VectorLib.multiplyMV(r, xyz);
@@ -911,6 +920,36 @@ object Constellations {
     val lng = VectorLib.xyzToLng(xyz);
     val lat = VectorLib.xyzToLat(xyz);
     icrsToConstellation(lng, lat);
+  }
+
+  val constellationsEcliptical = IndexedSeq(
+    ("02h00m", "この時期に南の空にいる黄道十二星座はおひつじ座です。西から東に順番に、みずがめ座、うお座、おひつじ座、おうし座、ふたご座、かに座の順に並んでいます"),
+    ("03h00m", "この時期に南の空高くにいる黄道十二星座はおうし座です。西から東に順番に、うお座、おひつじ座、おうし座、ふたご座、かに座、の順に並んでいます"),
+    ("06h00m", "この時期に南の空高くにいる黄道十二星座はふたご座です。西から東に順番に、おひつじ座、おうし座、ふたご座、かに座、しし座の順に並んでいます"),
+    ("08h00m", "この時期に南の空高くにいる黄道十二星座はかに座です。西から東に順番に、おうし座、ふたご座、かに座、しし座、おとめ座の順に並んでいます"),
+    ("09h20m", "この時期に南の空にいる黄道十二星座はしし座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座の順に並んでいます"),
+    ("12h00m", "この時期に南の空にいる黄道十二星座はおとめ座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座、てんびん座、さそり座の順に並んでいます"),
+    ("14h00m", "この時期に南の空にいる黄道十二星座はてんびん座です。西から東に順番に、しし座、おとめ座、てんびん座、さそり座、いて座の順に並んでいます"),
+    ("16h00m", "この時期に南の空にいる黄道十二星座はさそり座です。西から東に順番に、おとめ座、てんびん座、さそり座、いて座、やぎ座の順に並んでいます"),
+    ("17h40m", "この時期に南の空にいる黄道十二星座はいて座です。西から東に順番に、てんびん座、さそり座、いて座、やぎ座、みずがめ座の順に並んでいます"),
+    ("20h00m", "この時期に南の空にいる黄道十二星座はやぎ座です。西から東に順番に、いて座、やぎ座、みずがめ座、うお座の順に並んでいます"),
+    ("22h00m", "この時期に南の空にいる黄道十二星座はみずがめ座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座の順に並んでいます"),
+    ("23h20m", "この時期に南の空にいる黄道十二星座はうお座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座、ふたご座の順に並んでいます"),
+    ("24h00m", ""),
+  );
+
+  def siderealTimeToConstellationEcliptical(siderealTime: Double): String = {
+    val lng5 = (siderealTime * PI57 / 5).toInt * 5;
+    val key = "%02dh%02dm".format(lng5 / 15, lng5 % 15 * 4);
+    val p = constellationsEcliptical.indexWhere(_._1 > key) - 1;
+    val cons = if (p == -1) {
+      constellationsEcliptical(constellationsEcliptical.size - 2)._2;
+    } else if (p >= 0) {
+      constellationsEcliptical(p)._2;
+    } else {
+      throw new Exception();
+    }
+    cons;
   }
 }
 
@@ -1146,7 +1185,7 @@ sealed trait TweetContent {
   def date: String = TimeLib.modifiedJulianDayToStringJSTDate(time);
 }
 
-var tweetContents: List[TweetContent] = Nil;
+var tweets: Map[String, List[TweetContent]] = Map.empty;
 
 sealed trait OnSunsetTweetContent extends TweetContent {
   def day: Int;
@@ -1156,7 +1195,9 @@ sealed trait OnSunsetTweetContent extends TweetContent {
 }
 
 def putTweet(tc: TweetContent): Unit = {
-  tweetContents = tc :: tweetContents;
+  val date = TimeLib.modifiedJulianDayToStringJSTDate(tc.time);
+  val list = tweets.getOrElse(date, Nil);
+  tweets = tweets.updated(date, tc :: list);
 }
 
 // 日没時の西の空
@@ -1686,13 +1727,35 @@ planetCons.foreach { case (time, planetName, xyz) =>
 
 //==============================================================================
 
-var tweets: Map[String, List[TweetContent]] = Map.empty;
-
-tweetContents.foreach { tc =>
-  val date = TimeLib.modifiedJulianDayToStringJSTDate(tc.time);
-  val list = tweets.getOrElse(date, Nil);
-  tweets = tweets.updated(date, tc :: list);
+{
+  val span = 14;
+  var nextDay: Int = 11;
+  (0 until period).foreach { day =>
+    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+    if (day >= nextDay && !tweets.contains(date)) {
+      val time = startTime + day + 21.0 / 24.0;
+      val sid = hcs.siderealTime(time);
+      val cons = Constellations.siderealTimeToConstellationEcliptical(sid);
+      putTweet(time, cons);
+      nextDay = day + span;
+    }
+  }
 }
+
+/*
+{
+  (0 until period).foreach { day =>
+    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+    if (!tweets.contains(date)) {
+      val time = startTime + day + 21.0 / 24.0;
+      val sid = hcs.siderealTime(time);
+      putTweet(time, "#empty");
+    }
+  }
+}
+*/
+
+//==============================================================================
 
 (0 until period).foreach { d =>
   val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + d);
