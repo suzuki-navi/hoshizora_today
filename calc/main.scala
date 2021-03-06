@@ -1181,6 +1181,7 @@ val moonPhaseTerms: IndexedSeq[(Double, Int, Double)] = calcMoonPhaseTerms();
 sealed trait TweetContent {
   def time: Double;
   def message: String;
+  def hashtags: List[String];
 
   def date: String = TimeLib.modifiedJulianDayToStringJSTDate(time);
 }
@@ -1190,6 +1191,7 @@ var tweets: Map[String, List[TweetContent]] = Map.empty;
 sealed trait OnSunsetTweetContent extends TweetContent {
   def day: Int;
   def message: String;
+  def hashtags: List[String];
 
   def time: Double = sunsetTimes(day);
 }
@@ -1206,16 +1208,19 @@ def putTweet(tc: TweetContent): Unit = {
     def day: Int;
     def message: String;
     def message2: String;
+    def hashtags: List[String];
   }
   case class SunsetTweetContent(day: Int) extends OnSunsetTweetContent2 {
     def message: String = "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
     def message2: String = "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+    def hashtags: List[String] = Nil;
   }
   case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent2 {
     def azi360: Int = (azi * PI57 + 0.5).toInt;
     def alt360: Int = (alt * PI57 + 0.5).toInt;
     def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
     def message2: String = "新月後の細い月は日没時に西の空高度約%d°にいます".format(alt360);
+    def hashtags: List[String] = Nil;
   }
   case class SunsetPlanetTweetContent(day: Int, planetName: String,
     azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent2 {
@@ -1234,9 +1239,11 @@ def putTweet(tc: TweetContent): Unit = {
     } else {
       "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
     }
+    def hashtags: List[String] = if (planetName == "水星" || planetName == "金星") { List(planetName) } else { Nil };
   }
   case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent2]) extends OnSunsetTweetContent {
     def message: String = tc.map(_.message2).mkString("。");
+    def hashtags: List[String] = tc.flatMap(_.hashtags);
   }
 
   val aziThres0 = 200 / PI57;
@@ -1365,17 +1372,18 @@ def putTweet(tc: TweetContent): Unit = {
 {
   val termStrs = IndexedSeq(
     "新月",
-    "月相 1/8。新月と上弦の中間です",
-    "上弦の月",
-    "月相 3/8。上弦と満月の中間です",
-    "満月",
-    "月相 5/8。満月と下弦の中間です",
-    "下弦の月",
-    "月相 7/8。下弦と新月の中間です",
+    "月相 1/8。新月と上弦の中間です \uD83C\uDF12",
+    "上弦の月 \uD83C\uDF13",
+    "月相 3/8。上弦と満月の中間です \uD83C\uDF14",
+    "満月 \uD83C\uDF15",
+    "月相 5/8。満月と下弦の中間です \uD83C\uDF16",
+    "下弦の月 \uD83C\uDF17",
+    "月相 7/8。下弦と新月の中間です \uD83C\uDF18",
   );
   case class MoonPhaseTermTweetContent(rawTime: Double, term: Int) extends TweetContent {
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = termStrs(term);
+    def hashtags: List[String] = Nil;
   }
   case class FullMoonDistanceTweetContent(rawTime: Double, flag: Boolean) extends TweetContent {
     // true: 近い, false: 遠い
@@ -1385,6 +1393,7 @@ def putTweet(tc: TweetContent): Unit = {
     } else {
       "満月。月が地球から遠く、もっとも小さい満月です";
     }
+    def hashtags: List[String] = Nil;
   }
   (8 until (moonPhaseTerms.size - 8)).foreach { i =>
     val (time, term, distance) = moonPhaseTerms(i);
@@ -1609,9 +1618,9 @@ val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] 
 
     elongationEvents.foreach { case (time, flag) =>
       if (flag) {
-        planetPhase = (time, planetName, "西方最大離角(黄経基準)", true, None) :: planetPhase;
+        planetPhase = (time, planetName, "西方最大離角(黄経基準) \uD83C\uDF17", true, None) :: planetPhase;
       } else {
-        planetPhase = (time, planetName, "東方最大離角(黄経基準)", true, None) :: planetPhase;
+        planetPhase = (time, planetName, "東方最大離角(黄経基準) \uD83C\uDF13", true, None) :: planetPhase;
       }
     }
 
@@ -1676,7 +1685,9 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
 // ツイート文字列構築
 //==============================================================================
 
-case class LegacyTweetContent(time: Double, message: String) extends  TweetContent;
+case class LegacyTweetContent(time: Double, message: String) extends  TweetContent {
+  def hashtags: List[String] = Nil;
+}
 
 def putTweet(time: Double, msg: String): Unit = {
   putTweet(LegacyTweetContent(time, msg));
@@ -1709,10 +1720,10 @@ planetPhase.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
   }
   xyzOpt match {
   case None =>
-    putTweet(time2, "%sが%s".format(planetName, content));
+    putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
   case Some(xyz) =>
     val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-    putTweet(time2, "%s%sが%s。%sにいます".format(conscomment, planetName, content, cons));
+    putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName));
   }
 }
 
@@ -1722,12 +1733,13 @@ moonCons.foreach { case (time, xyz) =>
 }
 planetCons.foreach { case (time, planetName, xyz) =>
   val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます".format(conscomment, planetName, cons));
+  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName));
 }
 
 //==============================================================================
 
 {
+ val hashtag = " #星座";
   val span = 14;
   var nextDay: Int = 11;
   (0 until period).foreach { day =>
@@ -1736,26 +1748,25 @@ planetCons.foreach { case (time, planetName, xyz) =>
       val time = startTime + day + 21.0 / 24.0;
       val sid = hcs.siderealTime(time);
       val cons = Constellations.siderealTimeToConstellationEcliptical(sid);
-      putTweet(time, cons);
+      putTweet(time, cons + hashtag);
       nextDay = day + span;
     }
   }
 }
 
-/*
 {
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
     if (!tweets.contains(date)) {
       val time = startTime + day + 21.0 / 24.0;
       val sid = hcs.siderealTime(time);
-      putTweet(time, "#empty");
+      System.err.println("%s #empty".format(date));
     }
   }
 }
-*/
 
 //==============================================================================
+// ツイート出力
 
 (0 until period).foreach { d =>
   val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + d);
@@ -1764,7 +1775,8 @@ planetCons.foreach { case (time, planetName, xyz) =>
     tweets(date).sortBy(_.time).foreach { case tc =>
       val time = tc.time;
       if (time >= startTime && time < endTime) {
-        println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), tc.message));
+        val msg = tc.message + tc.hashtags.map(" #" + _).mkString;
+        println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
       }
     }
   }
