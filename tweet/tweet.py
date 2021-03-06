@@ -43,9 +43,6 @@ def isTimeMatch(record, now):
     return False
 
 def parseDataLine(line):
-    p = line.find('#')
-    if (p >= 0):
-        line = line[0:p]
     line = line.strip()
     cols = line.split(sep=' ', maxsplit=1)
     try:
