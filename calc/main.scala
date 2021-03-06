@@ -957,21 +957,15 @@ object Constellations {
     ("24h00m", ""),
   );
 
-/*
   val winter = IndexedSeq(
-    ("07h40m", "ふたご座の左側の明るい星ポルックスは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("08h00m", ""),
+    ("01h00m", "冬のダイヤモンドは東の空から昇ってきています"),
+    ("03h00m", "冬のダイヤモンドは南東の空にいます"),
+    ("04h40m", "冬のダイヤモンドは南の空高くにいます"),
+    ("07h20m", "冬のダイヤモンドは南西の空にいます"),
+    ("09h00m", "冬のダイヤモンドは西の空に沈みかけています"),
+    ("11h00m", ""),
     ("24h00m", ""),
   );
-
-  val summer = IndexedSeq(
-    ("18h00m", "こと座ベガは天頂付近にいます。夏の大三角形の1つです"),
-    ("19h20m", "わし座アルタイルは真南にいます。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます"),
-    ("20h20m", "はくちょう座デネブは天頂付近にいます。夏の大三角形の1つです"),
-    ("21h00m", ""),
-    ("24h00m", ""),
-  );
-*/
 
   val summer = IndexedSeq(
     ("16h20m", "夏の大三角形は東の空にいます"),
@@ -1818,8 +1812,55 @@ planetCons.foreach { case (time, planetName, xyz) =>
 
 //==============================================================================
 
+{
+  case class StarTweetContent(time: Double, message: String) extends TweetContent {
+    def hashtags: List[String] = List("星空");
+  }
+  val stars = IndexedSeq(
+    // J2000
+    ("00h11m", "ペガスス座の四角形の左の辺が真南です"),
+    ("03h47m", "おうし座すばるは天頂付近にいます"),
+    ("04h36m", "おうし座アルデバランは真南の空高くにいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("05h15m", "オリオン座リゲルは真南にいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("05h17m", "ぎょしゃ座カペラは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("05h55m", "オリオン座ベテルギウスは真南にいます。冬のダイヤモンドの中心の星です"),
+    ("06h45m", "おおいぬ座シリウスは真南にいます。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("07h35m", "ふたご座の右側の明るい星カストルは天頂付近にいます。左側のポルックスよりよりやや暗いです"),
+    ("07h39m", "こいぬ座プロキオンは真南にいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("07h45m", "ふたご座の左側の明るい星ポルックスは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("10h08m", "しし座の前足にあるレグルスは真南にいます"),
+    ("11h49m", "しし座の尾にあるデネボラは真南にいます"),
+    ("13h25m", "おとめ座スピカは真南にいます"),
+    ("14h16m", "うしかい座アークトゥルスは真南の空高くにいます。シリウス、カノープスに次ぐ明るさの恒星です"),
+    ("16h29m", "さそり座アンタレスは真南にいます"),
+    ("18h37m", "こと座ベガは天頂付近にいます。夏の大三角形の1つです"),
+    ("19h51m", "わし座アルタイルは真南にいます。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます"),
+    ("20h41m", "はくちょう座デネブは天頂付近にいます。夏の大三角形の1つです"),
+    ("23h04m", "ペガスス座の四角形の右の辺が真南です"),
+  ).map { t =>
+    ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2, t._2);
+  }
+  var index = -1;
+  (0 until period).foreach { day =>
+    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+    val time = startTime + day + 21.0 / 24.0;
+    val sid = hcs.siderealTime(time);
+    if (index < 0) {
+      index = stars.indexWhere(_._1 > sid);
+    } else {
+      if (sid > stars(index)._1 && (index > 0 || sid < PI)) {
+        putTweet(StarTweetContent(time, stars(index)._2));
+        index += 1;
+        if (index == stars.size) {
+          index = 0;
+        }
+      }
+    }
+  }
+}
+
 def tweetConstellations(data: IndexedSeq[(String, String)], span: Int): Unit = {
- val hashtag = " #星座";
+  val hashtag = " #星空";
   var nextDay: Int = 11;
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
@@ -1835,6 +1876,7 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int): Unit = {
   }
 }
 tweetConstellations(Constellations.ecliptical, 14);
+tweetConstellations(Constellations.winter, 7);
 tweetConstellations(Constellations.summer, 7);
 tweetConstellations(Constellations.northern, 14);
 
