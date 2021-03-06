@@ -8,7 +8,7 @@ cd $(dirname $0)
 
 echo "Starting calculating..."
 
-scala ./main.scala $start0 $end0 >| ../var/statuses.txt
+time scala -deprecation ./main.scala $start0 $end0 >| ../var/statuses.txt
 
 echo "Finished calculating..."
 
