@@ -1416,7 +1416,7 @@ def putTweet(tc: TweetContent): Unit = {
 
   (0 until moonPhaseTerms.size).foreach { i =>
     val (moonPhaseTime, term) = moonPhaseTerms(i);
-    if (term == 0) {
+    if (term == 0 && moonPhaseTime + 4 < endTime) {
       val d = (0 until 4).indexWhere { d =>
         val day = (moonPhaseTime + d - startTime).toInt;
         val alt = data(day)(2 * Moon + 1);
@@ -1859,9 +1859,9 @@ planetCons.foreach { case (time, planetName, xyz) =>
   }
 }
 
-def tweetConstellations(data: IndexedSeq[(String, String)], span: Int): Unit = {
+def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay: Int): Unit = {
   val hashtag = " #星空";
-  var nextDay: Int = 11;
+  var nextDay: Int = startDay;
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
     if (day >= nextDay && !tweets.contains(date)) {
@@ -1875,10 +1875,10 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int): Unit = {
     }
   }
 }
-tweetConstellations(Constellations.ecliptical, 14);
-tweetConstellations(Constellations.winter, 7);
-tweetConstellations(Constellations.summer, 7);
-tweetConstellations(Constellations.northern, 14);
+tweetConstellations(Constellations.ecliptical, 14, 11);
+tweetConstellations(Constellations.winter, 7, 11);
+tweetConstellations(Constellations.summer, 7, 11);
+tweetConstellations(Constellations.northern, 14, 11);
 
 // なにもツイートのない日付をエラー出力
 {
