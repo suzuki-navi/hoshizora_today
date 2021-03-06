@@ -922,7 +922,7 @@ object Constellations {
     icrsToConstellation(lng, lat);
   }
 
-  val constellationsEcliptical = IndexedSeq(
+  val ecliptical = IndexedSeq(
     ("02h00m", "この時期に南の空にいる黄道十二星座はおひつじ座です。西から東に順番に、みずがめ座、うお座、おひつじ座、おうし座、ふたご座、かに座の順に並んでいます"),
     ("03h00m", "この時期に南の空高くにいる黄道十二星座はおうし座です。西から東に順番に、うお座、おひつじ座、おうし座、ふたご座、かに座、の順に並んでいます"),
     ("06h00m", "この時期に南の空高くにいる黄道十二星座はふたご座です。西から東に順番に、おひつじ座、おうし座、ふたご座、かに座、しし座の順に並んでいます"),
@@ -938,14 +938,58 @@ object Constellations {
     ("24h00m", ""),
   );
 
-  def siderealTimeToConstellationEcliptical(siderealTime: Double): String = {
+  val northern = IndexedSeq(
+    ("00h00m", "この時期の北の空は、北極星の上にカシオペア座がいます"),
+    ("02h00m", "この時期の北の空は、北極星の11時の方向(左上)にカシオペア座がいます"),
+    ("04h00m", "この時期の北の空は、北極星の10時の方向(左上)にカシオペア座がいます"),
+    ("05h00m", "この時期の北の空は、北極星の10時の方向(左上)にカシオペア座、右に北斗七星がいます"),
+    ("06h00m", "この時期の北の空は、北極星の左にカシオペア座、右に北斗七星がいます"),
+    ("07h00m", "この時期の北の空は、北極星の2時の方向(右上)に北斗七星がいます"),
+    ("09h00m", "この時期の北の空は、北極星の1時の方向(右上)に北斗七星がいます"),
+    ("11h00m", "この時期の北の空は、北極星の上に北斗七星がいます"),
+    ("13h00m", "この時期の北の空は、北極星の11時の方向(左上)に北斗七星がいます"),
+    ("15h00m", "この時期の北の空は、北極星の10時の方向(左上)に北斗七星がいます"),
+    ("17h00m", "この時期の北の空は、北極星の左に北斗七星がいます"),
+    ("18h00m", "この時期の北の空は、北極星の左に北斗七星、右にカシオペア座がいます"),
+    ("20h00m", "この時期の北の空は、北極星の2時の方向(右上)にカシオペア座がいます"),
+    ("22h00m", "この時期の北の空は、北極星の1時の方向(右上)にカシオペア座がいます"),
+    ("24h00m", ""),
+  );
+
+/*
+  val winter = IndexedSeq(
+    ("07h40m", "ふたご座の左側の明るい星ポルックスは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("08h00m", ""),
+    ("24h00m", ""),
+  );
+
+  val summer = IndexedSeq(
+    ("18h00m", "こと座ベガは天頂付近にいます。夏の大三角形の1つです"),
+    ("19h20m", "わし座アルタイルは真南にいます。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます"),
+    ("20h20m", "はくちょう座デネブは天頂付近にいます。夏の大三角形の1つです"),
+    ("21h00m", ""),
+    ("24h00m", ""),
+  );
+*/
+
+  val summer = IndexedSeq(
+    ("16h20m", "夏の大三角形は東の空にいます"),
+    ("17h20m", "夏の大三角形は東の空高くにいます"),
+    ("18h00m", "夏の大三角形は頭上空高くにいます"),
+    ("21h00m", "夏の大三角形は西の空高くにいます"),
+    ("22h00m", "夏の大三角形は西の空にいます"),
+    ("23h20m", ""),
+    ("24h00m", ""),
+  );
+
+  def siderealTimeToConstellation(siderealTime: Double, data: IndexedSeq[(String, String)]): String = {
     val lng5 = (siderealTime * PI57 / 5).toInt * 5;
     val key = "%02dh%02dm".format(lng5 / 15, lng5 % 15 * 4);
-    val p = constellationsEcliptical.indexWhere(_._1 > key) - 1;
+    val p = data.indexWhere(_._1 > key) - 1;
     val cons = if (p == -1) {
-      constellationsEcliptical(constellationsEcliptical.size - 2)._2;
+      data(data.size - 2)._2;
     } else if (p >= 0) {
-      constellationsEcliptical(p)._2;
+      data(p)._2;
     } else {
       throw new Exception();
     }
@@ -1738,22 +1782,27 @@ planetCons.foreach { case (time, planetName, xyz) =>
 
 //==============================================================================
 
-{
+def tweetConstellations(data: IndexedSeq[(String, String)], span: Int) {
  val hashtag = " #星座";
-  val span = 14;
   var nextDay: Int = 11;
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
     if (day >= nextDay && !tweets.contains(date)) {
       val time = startTime + day + 21.0 / 24.0;
       val sid = hcs.siderealTime(time);
-      val cons = Constellations.siderealTimeToConstellationEcliptical(sid);
-      putTweet(time, cons + hashtag);
+      val cons = Constellations.siderealTimeToConstellation(sid, data);
+      if (cons != "") {
+        putTweet(time, cons + hashtag);
+      }
       nextDay = day + span;
     }
   }
 }
+tweetConstellations(Constellations.ecliptical, 14);
+tweetConstellations(Constellations.summer, 7);
+tweetConstellations(Constellations.northern, 14);
 
+// なにもツイートのない日付をエラー出力
 {
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
