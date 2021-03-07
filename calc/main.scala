@@ -1465,12 +1465,6 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
   hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
 }
 
-def isNightTime(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
-  val s = sunsetTimes(day);
-  time >= s && time - time.toInt < 17.0 / 24;
-}
-
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
   def calcMoonLng(time: Double): Double = {
     val utc = time;
@@ -1485,6 +1479,45 @@ val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
     VectorLib.calcLngDiff(moonLng, sunLng);
   }
   MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
+}
+
+//==============================================================================
+
+def isNightTime(time: Double): Boolean = {
+  val day = (time - startTime).toInt;
+  val s = sunsetTimes(day);
+  time >= s && time - time.toInt < 16.0 / 24;
+}
+
+def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = {
+  val altThres0 = 10 / PI57;
+  val sun_distanceThres = 20.0 / PI57;
+  val utc = time;
+  val ut1 = time; // 近似的
+  val tdb = TimeLib.mjdutcToTdb(utc);
+  val sun_xyz = jplData.calcSunFromEarth(tdb);
+  val sun_distance = VectorLib.angularDistance(sun_xyz, xyz);
+  if (sun_distance < sun_distanceThres) {
+    None;
+  } else {
+    val time21 = time.toInt + 0.5;
+    val utc21 = time21;
+    val ut121 = utc21; // 近似的
+    val tdb21 = TimeLib.mjdutcToTdb(utc21);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb21);
+    val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+    val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut121);
+    if (alt >= altThres0) {
+      Some(time21);
+    } else {
+      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut121 + 2.0 / 24);
+      if (alt >= altThres0) {
+        Some(time21 + 2.0 / 24);
+      } else {
+        None; // TODO
+      }
+    }
+  }
 }
 
 //==============================================================================
@@ -1928,7 +1961,6 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 {
   val altThres0 = 10 / PI57;
   val distanceThres = 10.0 / PI57;
-  val sun_distanceThres = 20.0 / PI57;
 
   def calcClosest1(slowStarName: String, fastStarName: String, hashtags: List[String],
     slowStarXyzFunc: Double => Array[Double],
@@ -1974,32 +2006,32 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         val xyz_s = slowStarXyzFunc(tdb);
         val distance = VectorLib.angularDistance(xyz_s, xyz_f);
         if (distance < distanceThres) {
-          val sun_xyz = jplData.calcSunFromEarth(tdb);
-          val sun_distance = VectorLib.angularDistance(sun_xyz, xyz_f);
-          if (sun_distance >= sun_distanceThres) {
-            //TODO
-            //putTweet(CloseStarsTweetContent(time, 24, slowStarName, fastStarName, distance, hashtags));
+          getConjunctionTweetTime(time, xyz_f) match {
+            case Some(postTime) =>
+              putTweet(CloseStarsTweetContent(postTime, 24, slowStarName, fastStarName, distance, hashtags));
+            case None =>
+              // nop
           }
         }
       }
     }
   }
 
-  val stars0: IndexedSeq[(String, Array[Double])] = IndexedSeq(
-    ("03h47m", "+24°06′", "おうし座すばる"),
-    ("04h36m", "+16°31′", "おうし座アルデバラン"),
-    ("07h45m", "+28°02′", "ふたご座ポルックス"),
-    ("10h08m", "+11°58′", "しし座レグルス"),
-    ("13h25m", "-11°09′", "おとめ座スピカ"),
-    ("16h29m", "-26°26′", "さそり座アンタレス"),
-  ).map { case (lngStr, latStr, name) =>
+  val stars0: IndexedSeq[(String, Array[Double], List[String])] = IndexedSeq(
+    ("03h47m", "+24°06′", "おうし座すばる", List("プレアデス星団")),
+    ("04h36m", "+16°31′", "おうし座アルデバラン", Nil),
+    ("07h45m", "+28°02′", "ふたご座ポルックス", Nil),
+    ("10h08m", "+11°58′", "しし座レグルス", Nil),
+    ("13h25m", "-11°09′", "おとめ座スピカ", Nil),
+    ("16h29m", "-26°26′", "さそり座アンタレス", Nil),
+  ).map { case (lngStr, latStr, name, hashtags) =>
     val lng = (lngStr.substring(0, 2).toInt.toDouble + lngStr.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
     val lat = (latStr.substring(0, 3).toInt.toDouble + latStr.substring(4, 6).toInt.toDouble / 60) / 360 * PI2;
     val c = Math.cos(lat);
     val x = c * Math.cos(lng);
     val y = c * Math.sin(lng);
     val z = Math.sin(lat);
-    (name, Array(x, y, z));
+    (name, Array(x, y, z), hashtags);
   }
   val stars1 = IndexedSeq(
     ("水星", JplData.Mercury),
@@ -2013,7 +2045,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   );
   stars2.foreach { star2 =>
     stars0.foreach { star0 =>
-      calcClosest1(star0._1, star2._1, Nil,
+      calcClosest1(star0._1, star2._1, star0._3,
         { tdb: Double =>
           star0._2;
         },
@@ -2035,7 +2067,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   }
   stars1.foreach { star1 =>
     stars0.foreach { star0 =>
-      calcClosest2(star0._1, star1._1, Nil,
+      calcClosest2(star0._1, star1._1, star1._1 :: star0._3,
         { tdb: Double =>
           star0._2;
         },
