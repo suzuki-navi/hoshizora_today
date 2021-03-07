@@ -1817,13 +1817,13 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
 {
   val termStrs = IndexedSeq(
     "新月",
-    "月相 1/8。新月と上弦の中間です \uD83C\uDF12",
-    "上弦の月 \uD83C\uDF13",
-    "月相 3/8。上弦と満月の中間です \uD83C\uDF14",
-    "満月 \uD83C\uDF15",
-    "月相 5/8。満月と下弦の中間です \uD83C\uDF16",
-    "下弦の月 \uD83C\uDF17",
-    "月相 7/8。下弦と新月の中間です \uD83C\uDF18",
+    "月相 1/8。新月と上弦の中間です\uD83C\uDF12",
+    "上弦の月\uD83C\uDF13",
+    "月相 3/8。上弦と満月の中間です\uD83C\uDF14",
+    "満月\uD83C\uDF15",
+    "月相 5/8。満月と下弦の中間です\uD83C\uDF16",
+    "下弦の月\uD83C\uDF17",
+    "月相 7/8。下弦と新月の中間です\uD83C\uDF18",
   );
   case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, cons: Option[(String, String)]) extends TweetContent {
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
@@ -1841,9 +1841,9 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = {
       val msg = if (flag) {
-        "満月 \uD83C\uDF15。月が地球に近く、もっとも大きい満月です";
+        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です";
       } else {
-        "満月 \uD83C\uDF15。月が地球から遠く、もっとも小さい満月です";
+        "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です";
       }
       cons match {
         case Some((conscomment, cons)) => "%s%s。%sにいます".format(conscomment, msg, cons);
@@ -1980,11 +1980,11 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
       if (term == 0) {
         (time, planetName, "外合(黄経基準)", false, None);
       } else if (term == 1) {
-        (time, planetName, "東方最大離角(黄経基準) \uD83C\uDF13", true, None);
+        (time, planetName, "東方最大離角(黄経基準)\uD83C\uDF13", true, None);
       } else if (term == 2) {
         (time, planetName, "内合(黄経基準)", false, None);
       } else {
-        (time, planetName, "西方最大離角(黄経基準) \uD83C\uDF17", true, None);
+        (time, planetName, "西方最大離角(黄経基準)\uD83C\uDF17", true, None);
       }
     }
   }
