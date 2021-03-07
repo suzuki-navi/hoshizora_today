@@ -1461,6 +1461,8 @@ val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
 }
 
 //==============================================================================
+// ツイート管理
+//==============================================================================
 
 sealed trait TweetContent {
   def time: Double;
@@ -1540,12 +1542,16 @@ def putTweet(time: Double, msg: String): Unit = {
   }
 }
 
+//==============================================================================
 // 日没時の西の空
+//==============================================================================
+
 sealed trait OnSunsetTweetContent extends TweetContent {
   def day: Int;
   def message: String;
   def message2: String;
   def hashtags: List[String];
+  def starName: String;
 
   def time: Double = sunsetTimes(day);
 }
@@ -1562,6 +1568,7 @@ case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends On
   def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
   def message2: String = "新月後の細い月は日没時に西の空高度約%d°にいます".format(alt360);
   def hashtags: List[String] = Nil;
+  def starName: String = "月";
 }
 case class SunsetPlanetTweetContent(day: Int, planetName: String,
   azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
@@ -1580,7 +1587,22 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   } else {
     "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
   }
-  def hashtags: List[String] = if (planetName == "水星" || planetName == "金星") { List(planetName) } else { Nil };
+  def hashtags: List[String] = List(planetName);
+  def starName: String = planetName;
+}
+case class SunsetStarTweetContent(day: Int, starName: String,
+  azi: Double, alt: Double) extends OnSunsetTweetContent {
+  def alt360: Int = (alt * PI57 + 0.5).toInt;
+  def message: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
+  def message2: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
+  def hashtags: List[String] = List(starName);
+}
+
+case class SunsetTweetContent(day: Int) extends OnSunsetTweetContent {
+  def message: String = "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+  def message2: String = "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+  def hashtags: List[String] = Nil;
+  def starName: String = "";
 }
 
 // 日没時最大高度
@@ -1631,10 +1653,7 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
     val wday = TimeLib.wday(startTime + day);
     val sunsetTweets = getTweets(startTime + day).sunsetTweets;
     planets.foreach { p =>
-      if (wday == p._3 && !sunsetTweets.exists {
-        case SunsetPlanetTweetContent(_, p._1, _, _, _, _) => true;
-        case _ => false;
-      }) {
+      if (wday == p._3 && !sunsetTweets.exists(_.starName == p._1)) {
         val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
         if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
           val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
@@ -1653,14 +1672,12 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   val altThres0 = 10 / PI57;
 
   val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
+  val planets2 = IndexedSeq(("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn));
   (1 until period).foreach { day =>
     val sunsetTweets = getTweets(startTime + day).sunsetTweets;
     if (sunsetTweets.nonEmpty) {
       planets.foreach { p =>
-        if (!sunsetTweets.exists {
-          case SunsetPlanetTweetContent(_, p._1, _, _, _, _) => true;
-          case _ => false;
-        }) {
+        if (!sunsetTweets.exists(_.starName == p._1)) {
           val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
           if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
             val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
@@ -1671,27 +1688,25 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
       };
       {
         val p = ("月", JplData.Moon);
-        if (!sunsetTweets.exists {
-          case SunsetMoonTweetContent(_, _, _) => true;
-          case _ => false;
-        }) {
+        if (!sunsetTweets.exists(_.starName == p._1)) {
           val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
           if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
             putTweet(SunsetMoonTweetContent(day, azi, alt));
           }
         }
       }
+      planets2.foreach { p =>
+          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+            putTweet(SunsetStarTweetContent(day, p._1, azi, alt));
+          }
+      };
     }
   }
 }
 
 // 日没時間
 {
-   case class SunsetTweetContent(day: Int) extends OnSunsetTweetContent {
-    def message: String = "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    def message2: String = "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    def hashtags: List[String] = Nil;
-  }
   (0 until period).foreach { day =>
     val wday = TimeLib.wday(startTime + day);
     if (wday == 0) {
@@ -1700,7 +1715,10 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   }
 }
 
+//==============================================================================
 // 月相
+//==============================================================================
+
 {
   val termStrs = IndexedSeq(
     "新月",
@@ -1752,6 +1770,10 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   }.foreach(putTweet);
 }
 
+//==============================================================================
+// 近日点・遠日点
+//==============================================================================
+
 MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
@@ -1761,6 +1783,10 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   val s = if (flag < 0) "近日点" else "遠日点";
   putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
 }
+
+//==============================================================================
+// 惑星の天象
+//==============================================================================
 
 {
   def calcInnerPlanetLngEc(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
@@ -1850,7 +1876,10 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   }
 }
 
+//==============================================================================
 // 21時・23時の惑星
+//==============================================================================
+
 val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, Array[Double])]) = {
   var moonCons: List[(Double, Array[Double])] = Nil;
   var planetCons: List[(Double, String, Array[Double])] = Nil;
@@ -1903,10 +1932,6 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
   (moonCons, planetCons);
 }
 
-//==============================================================================
-// ツイート文字列構築
-//==============================================================================
-
 moonCons.foreach { case (time, xyz) =>
   val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
   putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 6), "%s月は%sにいます".format(conscomment, cons));
@@ -1917,6 +1942,8 @@ planetCons.foreach { case (time, planetName, xyz) =>
 }
 
 //==============================================================================
+// 星座
+//==============================================================================
 
 {
   case class StarTweetContent(time: Double, message: String) extends TweetContent {
@@ -1924,25 +1951,25 @@ planetCons.foreach { case (time, planetName, xyz) =>
   }
   val stars = IndexedSeq(
     // J2000
-    ("00h11m", "ペガスス座の四角形の左の辺が真南です"),
-    ("03h47m", "おうし座すばるは天頂付近にいます"),
-    ("04h36m", "おうし座アルデバランは真南の空高くにいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("05h15m", "オリオン座リゲルは真南にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("05h17m", "ぎょしゃ座カペラは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("05h55m", "オリオン座ベテルギウスは真南にいます。冬のダイヤモンドの中心の星です"),
-    ("06h45m", "おおいぬ座シリウスは真南にいます。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("07h35m", "ふたご座の西側の明るい星カストルは天頂付近にいます。東側のポルックスよりよりやや暗いです"),
-    ("07h39m", "こいぬ座プロキオンは真南にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("07h45m", "ふたご座の東側の明るい星ポルックスは天頂付近にいます。西側のカストルよりも明るく、冬のダイヤモンドを構成する6個の星の1つです"),
-    ("10h08m", "しし座の前足にあるレグルスは真南にいます。その東側にはしし座の尾のデネボラがいます"),
-    ("11h49m", "しし座の尾にあるデネボラは真南にいます"),
-    ("13h25m", "おとめ座スピカは真南にいます"),
-    ("14h16m", "うしかい座アークトゥルスは真南の空高くにいます。シリウス、カノープスに次ぐ明るさの恒星です"),
-    ("16h29m", "さそり座アンタレスは真南にいます"),
-    ("18h37m", "こと座ベガは天頂付近にいます。夏の大三角形の1つです"),
-    ("19h51m", "わし座アルタイルは真南にいます。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます"),
-    ("20h41m", "はくちょう座デネブは天頂付近にいます。夏の大三角形の1つです"),
-    ("23h04m", "ペガスス座の四角形の右の辺が真南です"),
+    ("00h11m", "ペガスス座の四角形の左の辺が南中"),
+    ("03h47m", "おうし座すばるが南中。天頂付近にいます"),
+    ("04h36m", "おうし座アルデバランが南中。南の空高くにいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("05h15m", "オリオン座リゲルが南中。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("05h17m", "ぎょしゃ座カペラが南中。天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("05h55m", "オリオン座ベテルギウスが南中。冬のダイヤモンドの中心の星です"),
+    ("06h45m", "おおいぬ座シリウスが南中。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("07h35m", "ふたご座の西側の明るい星カストルが南中。天頂付近にいます。東側のポルックスよりよりやや暗いです"),
+    ("07h39m", "こいぬ座プロキオンが南中。冬のダイヤモンドを構成する6個の星の1つです"),
+    ("07h45m", "ふたご座の東側の明るい星ポルックスが南中。天頂付近にいます。西側のカストルよりも明るく、冬のダイヤモンドを構成する6個の星の1つです"),
+    ("10h08m", "しし座の前足にあるレグルスが南中。その東側にはしし座の尾のデネボラがいます"),
+    ("11h49m", "しし座の尾にあるデネボラが南中。その西側にはしし座の前足のレグルスがいます"),
+    ("13h25m", "おとめ座スピカが南中"),
+    ("14h16m", "うしかい座アークトゥルスが南中。南の空高くにいます。シリウス、カノープスに次ぐ明るさの恒星です"),
+    ("16h29m", "さそり座アンタレスが南中"),
+    ("18h37m", "こと座ベガが南中。天頂付近にいます。夏の大三角形の1つです"),
+    ("19h51m", "わし座アルタイルが南中。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます"),
+    ("20h41m", "はくちょう座デネブが南中。天頂付近にいます。夏の大三角形の1つです"),
+    ("23h04m", "ペガスス座の四角形の右の辺が南中"),
   ).map { t =>
     ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2, t._2);
   }
@@ -1986,7 +2013,9 @@ tweetConstellations(Constellations.winter, 7, 11);
 tweetConstellations(Constellations.summer, 7, 11);
 tweetConstellations(Constellations.northern, 14, 11);
 
+//==============================================================================
 // なにもツイートのない日付をエラー出力
+
 {
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);

@@ -18,3 +18,5 @@ cat ../var/statuses.txt | node patch.js $start1 $end1 >| ../var/data.txt
 
 mv ../var/data.txt ../data.txt
 
+cat ../data.txt | perl -nle '/^[-:T0-9]+ #/ and print' >&2
+
