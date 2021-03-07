@@ -2214,6 +2214,33 @@ planetCons.foreach { case (time, planetName, xyz) =>
 }
 
 //==============================================================================
+
+val manualTweet = """
+2021-11-05T12:00 天王星が衝
+2021-09-15T12:00 海王星が衝
+2021-07-18T12:00 冥王星が衝
+
+2021-11-28T12:00 準惑星ケレスが衝
+2021-09-09T12:00 小惑星パラスが衝
+2021-06-08T12:00 小惑星ジュノーが衝
+2021-03-08T12:00 小惑星ベスタが衝
+
+2021-04-28T12:00 準惑星ハウメアが衝
+2021-04-09T12:00 準惑星マケマケが衝
+2021-10-22T12:00 準惑星エリスが衝
+""";
+
+manualTweet.split("\n").foreach { line =>
+  val cols = line.split(" ", 2);
+  if (cols.length == 2) {
+    val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
+    val msg = cols(1);
+     putTweet(time, msg);
+  }
+}
+
+
+//==============================================================================
 // 星座
 //==============================================================================
 
@@ -2283,19 +2310,18 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay:
 }
 tweetConstellations(Constellations.ecliptical, 14, 59);
 tweetConstellations(Constellations.winter, 7, 36);
-tweetConstellations(Constellations.summer, 7, 11);
+tweetConstellations(Constellations.summer, 7, 162);
 tweetConstellations(Constellations.northern, 14, 39);
 
 //==============================================================================
-// なにもツイートのない日付をエラー出力
+// なにもツイートのない日付
 
 {
   (0 until period).foreach { day =>
-    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-    if (getTweets(startTime + day).isEmpty) {
-      val time = startTime + day + 21.0 / 24.0;
-      val sid = hcs.siderealTime(time);
-      System.err.println("%s #empty".format(date));
+    val time = startTime + day;
+    val date = TimeLib.modifiedJulianDayToStringJSTDate(time);
+    if (getTweets(time).isEmpty) {
+      putTweet(time, "#empty".format(date));
     }
   }
 }
