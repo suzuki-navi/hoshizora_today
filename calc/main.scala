@@ -77,6 +77,7 @@ object JplData {
   }
 
   sealed trait TargetPlanet;
+  object Moon    extends TargetPlanet;
   object Mercury extends TargetPlanet;
   object Venus   extends TargetPlanet;
   object Mars    extends TargetPlanet;
@@ -191,6 +192,7 @@ class JplData(dataPath: String) {
   def calcPlanetFromEarth(time: Double, targetPlanet: JplData.TargetPlanet): Array[Double] = {
     val earth = calcEarthPosition(time);
     val target = targetPlanet match {
+      case JplData.Moon    => return calcMoonFromEarth(time);
       case JplData.Mercury => calcPlanetPosition(time, JplData.MERCURY_JPL);
       case JplData.Venus   => calcPlanetPosition(time, JplData.VENUS_JPL);
       case JplData.Mars    => calcPlanetPosition(time, JplData.MARS_JPL);
@@ -1412,10 +1414,10 @@ val hcs = new Hcs(tokyoLng, tokyoLat);
 // イベント計算
 //==============================================================================
 
-val sunsetTimes: IndexedSeq[Double] = {
+val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, tdb, bpnMatrix
   val altHor = -0.90 / PI57;
   (0 until period).map { d =>
-    Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
+    val time = Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val utc = time;
       val ut1 = utc; // 近似的
       val tdb = TimeLib.mjdutcToTdb(utc);
@@ -1425,7 +1427,21 @@ val sunsetTimes: IndexedSeq[Double] = {
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(sun2, ut1);
       alt;
     }
+    val ut1 = time; // 近似的
+    val tdb = TimeLib.mjdutcToTdb(time);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    (time, tdb, bpnMatrix);
   }
+}
+
+def sunsetTimes(day: Int): Double = sunsetTimesData(day)._1;
+
+def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Double, Double) = { // azi, alt
+  val (time, tdb, bpnMatrix) = sunsetTimesData(day);
+  val ut1 = time; // 近似的
+  val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+  val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+  hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
 }
 
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
@@ -1458,16 +1474,46 @@ case class LegacyTweetContent(time: Double, message: String) extends  TweetConte
   def hashtags: List[String] = Nil;
 }
 
-var tweets: Map[String, List[TweetContent]] = Map.empty;
+case class DateTweets(otherTweets: List[TweetContent], sunsetTweets: List[OnSunsetTweetContent]) {
+  def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty;
+  def added(tc: TweetContent): DateTweets = {
+    tc match {
+      case tc: OnSunsetTweetContent => this.copy(sunsetTweets = tc :: this.sunsetTweets);
+      case _ => this.copy(otherTweets = tc :: this.otherTweets);
+    }
+  }
+  def tweets: List[TweetContent] = {
+    import Ordering.Double.IeeeOrdering;
+    ((if (sunsetTweets.isEmpty) {
+      Nil;
+    } else if (sunsetTweets.tail.isEmpty) {
+      sunsetTweets.head :: Nil;
+    } else {
+      MultiSunsetTweetContent(sunsetTweets.head.day, sunsetTweets.reverse) :: Nil;
+    }) ::: otherTweets).sortBy(_.time);
+  }
+}
 
-def putTweet(time: Double, msg: String): Unit = {
-  putTweet(LegacyTweetContent(time, msg));
+var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
+  val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+  (date, DateTweets(Nil, Nil));
+}.toMap;
+
+def getTweets(time: Double): DateTweets = {
+  val date = TimeLib.modifiedJulianDayToStringJSTDate(time);
+  _tweets(date);
 }
 
 def putTweet(tc: TweetContent): Unit = {
   val date = TimeLib.modifiedJulianDayToStringJSTDate(tc.time);
-  val list = tweets.getOrElse(date, Nil);
-  tweets = tweets.updated(date, tc :: list);
+  if (_tweets.contains(date)) {
+    val tw = _tweets(date);
+    _tweets = _tweets.updated(date, tw.added(tc));
+  }
+}
+
+def putTweet(time: Double, msg: String): Unit = {
+  putTweet(LegacyTweetContent(time, msg));
 }
 
 // 24節気
@@ -1495,175 +1541,161 @@ def putTweet(tc: TweetContent): Unit = {
 }
 
 // 日没時の西の空
+sealed trait OnSunsetTweetContent extends TweetContent {
+  def day: Int;
+  def message: String;
+  def message2: String;
+  def hashtags: List[String];
+
+  def time: Double = sunsetTimes(day);
+}
+
+case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent]) extends TweetContent {
+  def time: Double = sunsetTimes(day);
+  def message: String = tc.map(_.message2).mkString("。");
+  def hashtags: List[String] = tc.flatMap(_.hashtags);
+}
+
+case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent {
+  def azi360: Int = (azi * PI57 + 0.5).toInt;
+  def alt360: Int = (alt * PI57 + 0.5).toInt;
+  def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
+  def message2: String = "新月後の細い月は日没時に西の空高度約%d°にいます".format(alt360);
+  def hashtags: List[String] = Nil;
+}
+case class SunsetPlanetTweetContent(day: Int, planetName: String,
+  azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
+  def alt360: Int = (alt * PI57 + 0.5).toInt;
+  def message: String = if (isMax) {
+    "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
+  } else if (isIncreasing) {
+    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  }
+  def message2: String = if (isMax) {
+    "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
+  } else if (isIncreasing) {
+    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  }
+  def hashtags: List[String] = if (planetName == "水星" || planetName == "金星") { List(planetName) } else { Nil };
+}
+
+// 日没時最大高度
 {
-  sealed trait OnSunsetTweetContent extends TweetContent {
-    def day: Int;
-    def message: String;
-    def hashtags: List[String];
-
-    def time: Double = sunsetTimes(day);
-  }
-
-  sealed trait OnSunsetTweetContent2 extends OnSunsetTweetContent {
-    def day: Int;
-    def message: String;
-    def message2: String;
-    def hashtags: List[String];
-  }
-  case class SunsetTweetContent(day: Int) extends OnSunsetTweetContent2 {
-    def message: String = "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    def message2: String = "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    def hashtags: List[String] = Nil;
-  }
-  case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent2 {
-    def azi360: Int = (azi * PI57 + 0.5).toInt;
-    def alt360: Int = (alt * PI57 + 0.5).toInt;
-    def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
-    def message2: String = "新月後の細い月は日没時に西の空高度約%d°にいます".format(alt360);
-    def hashtags: List[String] = Nil;
-  }
-  case class SunsetPlanetTweetContent(day: Int, planetName: String,
-    azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent2 {
-    def alt360: Int = (alt * PI57 + 0.5).toInt;
-    def message: String = if (isMax) {
-      "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
-    } else if (isIncreasing) {
-      "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-    } else {
-      "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
+  planets.foreach { p =>
+    MathLib.findMaxMinListDiscrete(0, period, 15) { day =>
+      val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+      alt;
+    }.foreach { case (day, flag) =>
+      if (flag > 0) {
+        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+        putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, true, true));
+      }
     }
-    def message2: String = if (isMax) {
-      "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
-    } else if (isIncreasing) {
-      "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-    } else {
-      "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
-    }
-    def hashtags: List[String] = if (planetName == "水星" || planetName == "金星") { List(planetName) } else { Nil };
   }
-  case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent2]) extends OnSunsetTweetContent {
-    def message: String = tc.map(_.message2).mkString("。");
-    def hashtags: List[String] = tc.flatMap(_.hashtags);
-  }
+}
 
+// 新月直後の月
+{
   val aziThres0 = 200 / PI57;
   val aziThres1 = 315 / PI57;
   val altThres0 = 10 / PI57;
-  val Moon = 0;
-  val Mercury = 1;
-  val Venus = 2;
-  val data = new Array[Array[Double]](period);
-  val moonFlag = new Array[Boolean](period);
-  (0 until period).foreach { day =>
-    data(day) = new Array[Double](6);
-  }
-
-  val planets = IndexedSeq(("金星", JplData.Venus, 5, Venus), ("水星", JplData.Mercury, 3, Mercury));
-  var altData = (0 until period).foreach { day =>
-    val time = sunsetTimes(day);
-    val ut1 = time; // 近似的
-    val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    {
-      val xyz = jplData.calcMoonFromEarth(tdb);
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
-      data(day)(2 * Moon + 0) = azi;
-      data(day)(2 * Moon + 1) = alt;
-    }
-    (0 until planets.size).foreach { i =>
-      val xyz = jplData.calcPlanetFromEarth(tdb, planets(i)._2);
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
-      data(day)(2 * planets(i)._4 + 0) = azi;
-      data(day)(2 * planets(i)._4 + 1) = alt;
-    }
-  }
 
   (0 until moonPhaseTerms.size).foreach { i =>
     val (moonPhaseTime, term) = moonPhaseTerms(i);
     if (term == 0 && moonPhaseTime + 4 < endTime) {
       val d = (0 until 4).indexWhere { d =>
         val day = (moonPhaseTime + d - startTime).toInt;
-        val alt = data(day)(2 * Moon + 1);
+        val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
         alt >= altThres0;
       }
       val day = (moonPhaseTime + d - startTime).toInt;
-      moonFlag(day) = true;
+      val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
+      putTweet(SunsetMoonTweetContent(day, azi, alt));
     }
   }
+}
 
-  // 最大高度
-  (1 until (period-1)).foreach { day =>
-    val dayData = data(day);
+// 水曜・金曜
+{
+  val aziThres0 = 200 / PI57;
+  val aziThres1 = 315 / PI57;
+  val altThres0 = 10 / PI57;
+
+  val planets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
+  (1 until period).foreach { day =>
     val wday = TimeLib.wday(startTime + day);
-    var tc: List[OnSunsetTweetContent2] = Nil;
+    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
     planets.foreach { p =>
-      val azi = dayData(2 * p._4 + 0);
-      val alt = dayData(2 * p._4 + 1);
-      val isIncreasing = (alt >= data(day-1)(2 * p._4 + 1));
-      val isMax = (isIncreasing && (alt > data(day+1)(2 * p._4 + 1)));
-      if (isMax) {
-        tc = SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, isMax) :: tc;
-      }
-    }
-
-    // 新月直後の月
-    if (moonFlag(day)) {
-      val azi = dayData(2 * Moon + 0);
-      val alt = dayData(2 * Moon + 1);
-      tc = SunsetMoonTweetContent(day, dayData(2 * Moon + 0), dayData(2 * Moon + 1)) :: tc;
-    }
-
-    // 水曜・金曜
-    planets.foreach { p =>
-      val azi = dayData(2 * p._4 + 0);
-      val alt = dayData(2 * p._4 + 1);
-      if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0 && wday == p._3) {
-        if (!tc.exists {
-          case SunsetPlanetTweetContent(_, p._1, _, _, _, _) => true;
-          case _ => false;
-        }) {
-          val isIncreasing = (alt >= data(day-1)(2 * p._4 + 1));
-          tc = SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false) :: tc;
+      if (wday == p._3 && !sunsetTweets.exists {
+        case SunsetPlanetTweetContent(_, p._1, _, _, _, _) => true;
+        case _ => false;
+      }) {
+        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+        if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+          val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
+          val isIncreasing = (alt >= prevAlt);
+          putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
         }
       }
     }
+  }
+}
 
-    if (!tc.isEmpty) {
+// 日没ツイートがある場合に他の天体のツイートも追加
+{
+  val aziThres0 = 200 / PI57;
+  val aziThres1 = 315 / PI57;
+  val altThres0 = 10 / PI57;
+
+  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
+  (1 until period).foreach { day =>
+    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+    if (sunsetTweets.nonEmpty) {
       planets.foreach { p =>
-        if (!tc.exists {
+        if (!sunsetTweets.exists {
           case SunsetPlanetTweetContent(_, p._1, _, _, _, _) => true;
           case _ => false;
         }) {
-          val azi = dayData(2 * p._4 + 0);
-          val alt = dayData(2 * p._4 + 1);
+          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
           if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-            val isIncreasing = (alt >= data(day-1)(2 * p._4 + 1));
-            tc = SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false) :: tc;
+            val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
+            val isIncreasing = (alt >= prevAlt);
+            putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
+          }
+        }
+      };
+      {
+        val p = ("月", JplData.Moon);
+        if (!sunsetTweets.exists {
+          case SunsetMoonTweetContent(_, _, _) => true;
+          case _ => false;
+        }) {
+          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+            putTweet(SunsetMoonTweetContent(day, azi, alt));
           }
         }
       }
-      if (!tc.exists {
-        case SunsetMoonTweetContent(_, _, _) => true;
-        case _ => false;
-      }) {
-        val azi = dayData(2 * Moon + 0);
-        val alt = dayData(2 * Moon + 1);
-        if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-          tc = SunsetMoonTweetContent(day, dayData(2 * Moon + 0), dayData(2 * Moon + 1)) :: tc;
-        }
-      }
     }
+  }
+}
+
+// 日没時間
+{
+   case class SunsetTweetContent(day: Int) extends OnSunsetTweetContent {
+    def message: String = "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+    def message2: String = "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+    def hashtags: List[String] = Nil;
+  }
+  (0 until period).foreach { day =>
+    val wday = TimeLib.wday(startTime + day);
     if (wday == 0) {
-      tc = SunsetTweetContent(day) :: tc;
-    }
-    if (!tc.isEmpty) {
-      if (!tc.tail.isEmpty) {
-        putTweet(MultiSunsetTweetContent(day, tc.reverse));
-      } else {
-        putTweet(tc.head);
-      }
+      putTweet(SunsetTweetContent(day));
     }
   }
 }
@@ -1730,8 +1762,7 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
 }
 
-val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] = {
-  var planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] = Nil;
+{
   def calcInnerPlanetLngEc(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
@@ -1759,91 +1790,64 @@ val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] 
     d1;
   }
 
-  List(
-    ("火星", JplData.Mars, 779.94, TimeLib.stringToModifiedJulianDay("2020-10-14T00:00:00Z")),
-    ("木星", JplData.Jupiter, 398.88, TimeLib.stringToModifiedJulianDay("2020-07-14T00:00:00Z")),
-    ("土星", JplData.Saturn, 378.09, TimeLib.stringToModifiedJulianDay("2020-07-21T00:00:00Z")),
-  ).foreach { t =>
-    val (planetName, targetPlanet, synodicPeriod, conjunctionEpoch) = t;
-    val synodicPeriod5 = synodicPeriod * 0.5;
-
-    var conjunctionEvents: List[(Double, Int)] = Nil;
-    {
-      val n = ((startTime - conjunctionEpoch) / synodicPeriod5).toInt;
-      var time = conjunctionEpoch + n * synodicPeriod5;
-      var flag = (n % 2) == 0; // true: 衝, false: 合
-      while (time - synodicPeriod5 < endTime || conjunctionEvents.size < 2) {
-        time = TimeLib.floor(time, 1);
-        val th = if (flag) PI else 0;
-        time = Lib2.findCrossingBoundaryTime(th, true, true,
-          time - (synodicPeriod * 0.2).toInt, 24, (synodicPeriod * 0.4).toInt * 24) { time =>
-          calcOuterPlanetLngEq(time, targetPlanet);
-        }
-        if (time < 0.0) {
-          throw new Exception();
-        }
-        conjunctionEvents = (time, (if (flag) 2 else 0)) :: conjunctionEvents;
-        time = time + synodicPeriod5;
-        flag = !flag;
-      }
-    }
-
-    {
-      val conjunctionEvents2 = conjunctionEvents.reverse.toIndexedSeq;
-      (1 until conjunctionEvents2.size).foreach { i =>
-        val range1 = conjunctionEvents2(i)._1 - conjunctionEvents2(i-1)._1;
-        val time = TimeLib.floor(conjunctionEvents2(i-1)._1 + range1 * 0.2, 1);
-        val range = (range1 * 0.6).toInt;
-        val term = conjunctionEvents2(i-1)._2 + 1;
-        val th = if (term == 1) PI + PI5 else PI5;
-        val time2 = Lib2.findCrossingBoundaryTime(th, true, true,
-          time, 24, range * 24) { time =>
-          calcOuterPlanetLngEq(time, targetPlanet);
-        }
-        if (time2 < 0.0) {
-          throw new Exception();
-        }
-        conjunctionEvents = (time2, term) :: conjunctionEvents;
-      }
-    }
-
-    conjunctionEvents.foreach { case (time, term) =>
+  val planetPhases1: List[(Double, String, String, Boolean, Option[Array[Double]])] = List(
+    ("火星", JplData.Mars),
+    ("木星", JplData.Jupiter),
+    ("土星", JplData.Saturn),
+  ).flatMap { t =>
+    val (planetName, targetPlanet) = t;
+    MathLib.findCyclicPhaseListContinuous(4, startTime, endTime, 30, 24) { time =>
+      PI2 - calcOuterPlanetLngEq(time, targetPlanet);
+    }.map { case (time, term) =>
       val utc = time;
       val tdb = TimeLib.mjdutcToTdb(utc);
       val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
       if (term == 0) {
-        planetPhase = (time, planetName, "合(赤経基準)", false, None) :: planetPhase;
+        (time, planetName, "合(赤経基準)", false, None);
       } else if (term == 1) {
-        planetPhase = (time, planetName, "西矩(赤経基準)", false, Some(xyz)) :: planetPhase;
+        (time, planetName, "西矩(赤経基準)", false, Some(xyz));
       } else if (term == 2) {
-        planetPhase = (time, planetName, "衝(赤経基準)", false, Some(xyz)) :: planetPhase;
-      } else if (term == 3) {
-        planetPhase = (time, planetName, "東矩(赤経基準)", false, Some(xyz)) :: planetPhase;
+        (time, planetName, "衝(赤経基準)", false, Some(xyz));
+      } else {
+        (time, planetName, "東矩(赤経基準)", false, Some(xyz));
       }
     }
   }
 
-  List(
+  val planetPhases2: List[(Double, String, String, Boolean, Option[Array[Double]])] = List(
     ("水星", JplData.Mercury),
     ("金星", JplData.Venus),
-  ).foreach { t =>
+  ).flatMap { t =>
     val (planetName, targetPlanet) = t;
     MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
       calcInnerPlanetLngEc(time, targetPlanet);
-    }.foreach { case (time, term) =>
+    }.map { case (time, term) =>
       if (term == 0) {
-        planetPhase = (time, planetName, "外合(黄経基準)", false, None) :: planetPhase;
+        (time, planetName, "外合(黄経基準)", false, None);
       } else if (term == 1) {
-        planetPhase = (time, planetName, "東方最大離角(黄経基準) \uD83C\uDF13", true, None) :: planetPhase;
+        (time, planetName, "東方最大離角(黄経基準) \uD83C\uDF13", true, None);
       } else if (term == 2) {
-        planetPhase = (time, planetName, "内合(黄経基準)", false, None) :: planetPhase;
-      } else if (term == 3) {
-        planetPhase = (time, planetName, "西方最大離角(黄経基準) \uD83C\uDF17", true, None) :: planetPhase;
+        (time, planetName, "内合(黄経基準)", false, None);
+      } else {
+        (time, planetName, "西方最大離角(黄経基準) \uD83C\uDF17", true, None);
       }
     }
   }
 
-  planetPhase;
+  (planetPhases1 ++ planetPhases2).foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
+    val time2 = if (timeFlag) {
+      TimeLib.round(time, 24) - 1.0 / (24 * 4);
+    } else {
+      TimeLib.floor(time, 24) + 1.0 / (24 * 4);
+    }
+    xyzOpt match {
+    case None =>
+      putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
+    case Some(xyz) =>
+      val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
+      putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName));
+    }
+  }
 }
 
 // 21時・23時の惑星
@@ -1902,21 +1906,6 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
 //==============================================================================
 // ツイート文字列構築
 //==============================================================================
-
-planetPhase.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
-  val time2 = if (timeFlag) {
-    TimeLib.round(time, 24) - 1.0 / (24 * 4);
-  } else {
-    TimeLib.floor(time, 24) + 1.0 / (24 * 4);
-  }
-  xyzOpt match {
-  case None =>
-    putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
-  case Some(xyz) =>
-    val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-    putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName));
-  }
-}
 
 moonCons.foreach { case (time, xyz) =>
   val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
@@ -1981,7 +1970,7 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay:
   var nextDay: Int = startDay;
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-    if (day >= nextDay && !tweets.contains(date)) {
+    if (day >= nextDay && getTweets(startTime + day).isEmpty) {
       val time = startTime + day + 21.0 / 24.0;
       val sid = hcs.siderealTime(time);
       val cons = Constellations.siderealTimeToConstellation(sid, data);
@@ -2001,7 +1990,7 @@ tweetConstellations(Constellations.northern, 14, 11);
 {
   (0 until period).foreach { day =>
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-    if (!tweets.contains(date)) {
+    if (getTweets(startTime + day).isEmpty) {
       val time = startTime + day + 21.0 / 24.0;
       val sid = hcs.siderealTime(time);
       System.err.println("%s #empty".format(date));
@@ -2012,16 +2001,12 @@ tweetConstellations(Constellations.northern, 14, 11);
 //==============================================================================
 // ツイート出力
 
-(0 until period).foreach { d =>
-  val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + d);
-  if (tweets.contains(date)) {
-    import Ordering.Double.IeeeOrdering;
-    tweets(date).sortBy(_.time).foreach { case tc =>
-      val time = tc.time;
-      if (time >= startTime && time < endTime) {
-        val msg = tc.message + tc.hashtags.map(" #" + _).mkString;
-        println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
-      }
+(0 until period).foreach { day =>
+  getTweets(startTime + day).tweets.foreach { case tc =>
+    val time = tc.time;
+    if (time >= startTime && time < endTime) {
+      val msg = tc.message + tc.hashtags.map(" #" + _).mkString;
+      println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
     }
   }
 }
