@@ -992,83 +992,264 @@ object Constellations {
   }
 }
 
-object Lib {
+object MathLib {
 
-  // 外惑星の衝合矩、月の相、月と恒星の合などの探索
-  // 単調増加
-  // 0～PI2
-  // cycle: 1, 2, 4, 8, 24
-  def findEvents1(cycle: Int, startTime: Double, endTime: Double, firstStep: Double, stepCountPerDay: Int,
-    isDebug: Boolean = false)(f: Double => Double): IndexedSeq[(Double, Int)] = {
-    var result: List[(Double, Int)] = Nil;
-    var prevTime = startTime;
-    var prevValue: Double = f(prevTime) * PI2R * cycle;
-    while (prevTime < endTime) {
-      if (isDebug) {
-        System.err.println("DEBUG %f %f".format(prevTime, prevValue));
-      }
-      val time = prevTime + firstStep;
-      val value = f(time) * PI2R * cycle;
-      if (value.toInt - prevValue.toInt != 0) {
-        val t = findCrossingBoundaryTime(value.toInt.toDouble * PI2 / cycle, false, true, prevTime, stepCountPerDay, (stepCountPerDay * firstStep).toInt, isDebug)(f);
-        result = (t, value.toInt) :: result;
-      }
-      prevValue = value;
-      prevTime = time;
-    }
-    return result.reverse.toIndexedSeq;
-  }
-
-  // 距離などの最大値最小値の探索
   // 2つ目の返値 +1: 最大値
   // 2つ目の返値 -1: 最小値
-  def findEvents2(startTime: Double, endTime: Double, firstStep: Double, stepCountPerDay: Int,
-    isDebug: Boolean = false)(f: Double => Double): IndexedSeq[(Double, Int)] = {
-    findEvents3Sub(startTime, endTime, firstStep, stepCountPerDay, false, isDebug)(f).map { t =>
-      (t._1, 2 - t._2);
+  def findMaxMinListContinuous(start: Double, end: Double, step: Double, partitionCount: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
+    findMaxMinListContinuous(0, ((end - start) * partitionCount).toInt, (step * partitionCount).toInt) { x =>
+      f(x / partitionCount + start);
+    }.map { case (x, p) =>
+      (x / partitionCount + start, p);
     }
   }
 
-  // 内惑星の合、最大離角の探索
-  // 2つ目の返値 0: 外合
-  // 2つ目の返値 1: 東方最大離角
-  // 2つ目の返値 2: 内合
-  // 2つ目の返値 3: 西方最大離角
-  def findEvents3(startTime: Double, endTime: Double, firstStep: Double, stepCountPerDay: Int,
-    isDebug: Boolean = false)(f: Double => Double): IndexedSeq[(Double, Int)] = {
-    findEvents3Sub(startTime, endTime, firstStep, stepCountPerDay, true, isDebug)(f);
+  // 2つ目の返値 +1: 最大値
+  // 2つ目の返値 -1: 最小値
+  def findMaxMinListContinuous(start: Int, end: Int, step: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
+    findMaxMinListDiscrete(start, end, step)(x => f(x.toDouble)).map { case (x, p) =>
+      (x + findExtremum(f(x - 1), f(x), f(x + 1)), p);
+    }
   }
 
-  private def findEvents3Sub(startTime: Double, endTime: Double, firstStep: Double, stepCountPerDay: Int,
-    needCrossing: Boolean, isDebug: Boolean = false)(f: Double => Double): IndexedSeq[(Double, Int)] = {
-    var result: List[(Double, Int)] = Nil;
-    var prevIsIncrease: Int = 0;
-    var prevTime = startTime;
-    var prevValue: Double = f(prevTime)
-    while (prevTime < endTime) {
-      val time = prevTime + firstStep;
-      val value = f(time);
-      val isIncrease = if (value > prevValue) +1 else if (value < prevValue) -1 else 0;
-      if (isIncrease * prevIsIncrease < 0) {
-        val t = findMaxMinTime(isIncrease > 0, false, prevTime - firstStep, stepCountPerDay, (2 * firstStep * stepCountPerDay).toInt, isDebug)(f);
-        result = (t._1, 2 - prevIsIncrease) :: result;
-        prevIsIncrease = isIncrease;
-      } else if (prevIsIncrease == 0) {
-        prevIsIncrease = isIncrease;
+  // 返値 0: 増加中
+  // 返値 1: 最大値
+  // 返値 2: 減少中
+  // 返値 3: 最小値
+  def getMaxMinUpDownFlagListDiscrete(start: Int, end: Int, step: Int)(f: Int => Double): IndexedSeq[Int] = {
+    val maxMinList = findMaxMinListDiscrete(start, end, step)(f);
+    if (maxMinList.size == 0) {
+      if (f(start) > f(end)) {
+        IndexedSeq.fill(end - start)(2);
+      } else {
+        IndexedSeq.fill(end - start)(0);
       }
-      if (needCrossing && prevValue * value < 0.0) {
-        val t = findCrossingBoundaryTime(0.0, value < 0.0, false, prevTime, stepCountPerDay, (firstStep * stepCountPerDay).toInt, isDebug)(f);
-        if (value > 0.0) {
-          result = (t, 0) :: result;
+    } else {
+      var listIdx: Int = 0;
+      var nextIdx: Int = maxMinList(0)._1;
+      var flag: Int = maxMinList(0)._2;
+      (start until end).map { i =>
+        if (i == nextIdx) {
+          val value = 2 - flag;
+          listIdx += 1;
+          if (listIdx == maxMinList.size) {
+            nextIdx = end;
+            flag = - flag;
+          } else {
+            nextIdx = maxMinList(listIdx)._1;
+            flag = maxMinList(listIdx)._2;
+          }
+          value;
         } else {
-          result = (t, 2) :: result;
+          1 - flag;
         }
       }
-      prevTime = time;
-      prevValue = value;
+    }
+  }
+
+  // 2つ目の返値 +1: 最大値
+  // 2つ目の返値 -1: 最小値
+  def findMaxMinListDiscrete(start: Int, end: Int, step: Int)(f: Int => Double): IndexedSeq[(Int, Int)] = {
+    val fm = { x: Int => -f(x) }
+    var result: List[(Int, Int)] = Nil;
+    var s: Int = start;
+    var sv: Double = f(s);
+    var t: Int = s + step;
+    if (t >= end) {
+      return IndexedSeq.empty;
+    }
+    var tv: Double = f(t);
+    var u: Int = t + step;
+    while (u < end) {
+      val uv = f(u);
+      if (sv < tv && tv > uv) {
+        val max = findMaxDiscrete(s, t, u, sv, tv, uv)(f);
+        result = (max, +1) :: result;
+      } else if (sv > tv && tv < uv) {
+        val min = findMaxDiscrete(s, t, u, -sv, -tv, -uv)(fm);
+        result = (min, -1) :: result;
+      }
+      s = t;
+      sv = tv;
+      t = u;
+      tv = uv;
+      u = u + step;
+    }
+    result.reverse.toIndexedSeq;
+  }
+
+  // 2つ目の返値 0: 0
+  // 2つ目の返値 1: 最大値
+  // 2つ目の返値 2: 0
+  // 2つ目の返値 3: 最小値
+  def findMaxMinCrossingListContinuous(start: Double, end: Double, step: Double, partitionCount: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
+    findMaxMinCrossingListContinuous(0, ((end - start) * partitionCount).toInt, (step * partitionCount).toInt) { x =>
+      f(x / partitionCount + start);
+    }.map { case (x, p) =>
+      (x / partitionCount + start, p);
+    }
+  }
+
+  // 2つ目の返値 0: 0
+  // 2つ目の返値 1: 最大値
+  // 2つ目の返値 2: 0
+  // 2つ目の返値 3: 最小値
+  def findMaxMinCrossingListContinuous(start: Int, end: Int, step: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
+    findMaxMinCrossingListDiscrete(start, end, step)(x => f(x.toDouble)).map { case (x, p) =>
+      if (p % 2 != 0) {
+        (x + findExtremum(f(x - 1), f(x), f(x + 1)), p);
+      } else if (p == 0) {
+        (x + findCrossing(f(x), f(x + 1)), p);
+      } else {
+        (x + findCrossing(-f(x), -f(x + 1)), p);
+      }
+    }
+  }
+
+  // 2つ目の返値 0: 0
+  // 2つ目の返値 1: 最大値
+  // 2つ目の返値 2: 0
+  // 2つ目の返値 3: 最小値
+  def findMaxMinCrossingListDiscrete(start: Int, end: Int, step: Int)(f: Int => Double): IndexedSeq[(Int, Int)] = {
+    val fm = { x: Int => -f(x) }
+    var result: List[(Int, Int)] = Nil;
+    var s: Int = start;
+    var sv: Double = f(s);
+    var t: Int = s + step;
+    if (t >= end) {
+      return IndexedSeq.empty;
+    }
+    var tv: Double = f(t);
+    if (sv <= 0.0 && tv > 0.0) {
+      val cr = findCrossingDiscrete(s, t, sv, tv)(f);
+      result = (cr, 0) :: result;
+    } else if (sv >= 0.0 && tv < 0.0) {
+      val cr = findCrossingDiscrete(s, t, -sv, -tv)(fm);
+      result = (cr, 2) :: result;
+    }
+    var u: Int = t + step;
+    while (u < end) {
+      val uv = f(u);
+      if (sv < tv && tv > uv) {
+        val max = findMaxDiscrete(s, t, u, sv, tv, uv)(f);
+        result = (max, 1) :: result;
+      } else if (sv > tv && tv < uv) {
+        val min = findMaxDiscrete(s, t, u, -sv, -tv, -uv)(x => -f(x));
+        result = (min, 3) :: result;
+      }
+      if (tv <= 0.0 && uv > 0.0) {
+        val cr = findCrossingDiscrete(t, u, tv, uv)(f);
+        result = (cr, 0) :: result;
+      } else if (tv >= 0.0 && uv < 0.0) {
+        val cr = findCrossingDiscrete(t, u, -tv, -uv)(fm);
+        result = (cr, 2) :: result;
+      }
+      s = t;
+      sv = tv;
+      t = u;
+      tv = uv;
+      u = u + step;
+    }
+    result.reverse.toIndexedSeq;
+  }
+
+  def findCyclicPhaseListContinuous(cycle: Int, start: Double, end: Double, step: Double, partitionCount: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
+    findCyclicPhaseListContinuous(cycle, 0, ((end - start) * partitionCount).toInt, (step * partitionCount).toInt) { x =>
+      f(x / partitionCount + start);
+    }.map { case (x, p) =>
+      (x / partitionCount + start, p);
+    }
+  }
+
+  def findCyclicPhaseListContinuous(cycle: Int, start: Int, end: Int, step: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
+    val cycle_r = PI2R * cycle;
+    val cycle2 = cycle * 0.5;
+    val fs = (0 until cycle).map { i =>
+      { x: Int =>
+        val y = f(x) * cycle_r - i;
+        if (y >= cycle2) {
+          y - cycle;
+        } else {
+          y;
+        }
+      }
+    }
+    val fs0 = fs(0);
+    var result: List[(Double, Int)] = Nil;
+    var prevX: Int = start;
+    var nextI: Int = (f(prevX) * cycle_r).toInt + 1;
+    if (nextI == cycle) nextI = 0;
+    var fsi = fs(nextI);
+    var prevValue: Double = fsi(prevX)
+    while (prevX + 1 < end) {
+      val x = (prevX + step) min (end - 1);
+      val value = fsi(x);
+      if (value > 0.0) {
+        val t = findCrossingDiscrete(prevX, x, prevValue, value)(fsi);
+        val t2 = t + findCrossing(fsi(t), fsi(t + 1));
+        result = (t2, nextI) :: result;
+        nextI += 1;
+        if (nextI == cycle) nextI = 0;
+        fsi = fs(nextI);
+        prevValue = fsi(x);
+      } else {
+        prevValue = value;
+      }
+      prevX = x;
     }
     return result.reverse.toIndexedSeq;
   }
+
+  @scala.annotation.tailrec
+  private def findMaxDiscrete(s: Int, t: Int, u: Int, sv: Double, tv: Double, uv: Double)(f: Int => Double): Int = {
+    if (s + 1 == t && t + 1 == u) {
+      t;
+    } else if (s + u >= 2 * t) {
+      val c = (u + t) / 2;
+      val cv = f(c);
+      if (cv >= tv) {
+        findMaxDiscrete(t, c, u, tv, cv, uv)(f);
+      } else {
+        findMaxDiscrete(s, t, c, sv, tv, cv)(f);
+      }
+    } else {
+      val c = (s + t) / 2;
+      val cv = f(c);
+      if (cv > tv) {
+        findMaxDiscrete(s, c, t, sv, cv, tv)(f);
+      } else {
+        findMaxDiscrete(c, t, u, cv, tv, uv)(f);
+      }
+    }
+  }
+
+  @scala.annotation.tailrec
+  private def findCrossingDiscrete(s: Int, t: Int, sv: Double, tv: Double)(f: Int => Double): Int = {
+    if (s + 1 == t) {
+      s;
+    } else {
+      val c = (s + t) / 2;
+      val cv = f(c);
+      if (cv > 0.0) {
+        findCrossingDiscrete(s, c, sv, cv)(f);
+      } else {
+        findCrossingDiscrete(c, t, cv, tv)(f);
+      }
+    }
+  }
+
+  private def findExtremum(sv: Double, tv: Double, uv: Double): Double = {
+    val a: Double = (uv + sv) * 0.5 - tv;
+    val b: Double = (uv - sv) * 0.5;
+    -0.5 * b / a;
+  }
+
+  private def findCrossing(sv: Double, tv: Double): Double = {
+    -sv / (tv - sv);
+  }
+}
+
+object Lib2 {
 
   def findCrossingBoundaryTime(boundary: Double, isDecrease: Boolean, isCircle: Boolean,
     startTime: Double, stepCountPerDay: Int, maxStep: Int,
@@ -1231,10 +1412,10 @@ val hcs = new Hcs(tokyoLng, tokyoLat);
 // イベント計算
 //==============================================================================
 
-def calcSunsetTimes(): IndexedSeq[Double] = {
+val sunsetTimes: IndexedSeq[Double] = {
   val altHor = -0.90 / PI57;
   (0 until period).map { d =>
-    Lib.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
+    Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val utc = time;
       val ut1 = utc; // 近似的
       val tdb = TimeLib.mjdutcToTdb(utc);
@@ -1260,57 +1441,10 @@ val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
     val moonLng = VectorLib.xyzToLng(moon2);
     VectorLib.calcLngDiff(moonLng, sunLng);
   }
-  Lib.findEvents1(8, startTime, endTime, 3.0, 24)(calcMoonLng);
+  MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
 }
 
-// TODO 廃止したい
-def calcMoonPhaseTerms(): IndexedSeq[(Double, Int, Double)] = { // time, phase, distance
-  def calcMoonPhase(time: Double): Double = {
-    val utc = time;
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
-    val moon = jplData.calcMoonFromEarth(tdb);
-    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
-    val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-    val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
-    val sunLng = VectorLib.xyzToLng(sun2);
-    val moonLng = VectorLib.xyzToLng(moon2);
-    VectorLib.calcLngDiff(moonLng, sunLng);
-  }
-  def calcMoonDistance(time: Double): Double = {
-    val utc = time;
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
-    val moon = jplData.calcMoonFromEarth(tdb);
-    VectorLib.distance(moon);
-  }
-  var moonPhaseTerms: List[(Double, Int, Double)] = Nil;
-  var currTerm: Int = (calcMoonPhase(startTime) * 8 / PI2).toInt;
-  var nextStartTime: Double = startTime - 30.0;
-  var nextRange: Int = 5;
-  while (nextStartTime >= 0.0 && nextStartTime < endTime + 30.0) {
-    val nextTerm = if (currTerm == 7) 0 else currTerm + 1;
-    val nextTime = Lib.findCrossingBoundaryTime(nextTerm.toDouble * PI2 / 8, false, true,
-      nextStartTime, 24, nextRange * 24) { time =>
-      calcMoonPhase(time);
-    }
-    if (nextTime >= 0.0) {
-      val distance = calcMoonDistance(nextTime);
-      moonPhaseTerms = (nextTime, nextTerm, distance) :: moonPhaseTerms;
-      currTerm = nextTerm;
-      nextStartTime = TimeLib.floor(nextTime, 1) + 3.0;
-      nextRange = 3;
-    } else {
-      nextStartTime = -1.0;
-    }
-  }
-  moonPhaseTerms.reverse.toIndexedSeq;
-}
-
-val sunsetTimes: IndexedSeq[Double] = calcSunsetTimes();
-
-// TODO 廃止したい
-val moonPhaseTerms2: IndexedSeq[(Double, Int, Double)] = calcMoonPhaseTerms();
+//==============================================================================
 
 sealed trait TweetContent {
   def time: Double;
@@ -1320,14 +1454,14 @@ sealed trait TweetContent {
   def date: String = TimeLib.modifiedJulianDayToStringJSTDate(time);
 }
 
+case class LegacyTweetContent(time: Double, message: String) extends  TweetContent {
+  def hashtags: List[String] = Nil;
+}
+
 var tweets: Map[String, List[TweetContent]] = Map.empty;
 
-sealed trait OnSunsetTweetContent extends TweetContent {
-  def day: Int;
-  def message: String;
-  def hashtags: List[String];
-
-  def time: Double = sunsetTimes(day);
+def putTweet(time: Double, msg: String): Unit = {
+  putTweet(LegacyTweetContent(time, msg));
 }
 
 def putTweet(tc: TweetContent): Unit = {
@@ -1336,8 +1470,40 @@ def putTweet(tc: TweetContent): Unit = {
   tweets = tweets.updated(date, tc :: list);
 }
 
+// 24節気
+{
+  val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, startTime, endTime, 3.0, 24) { time =>
+    val utc = time;
+    val tdb = TimeLib.mjdutcToTdb(utc);
+    val sun = jplData.calcSunFromEarth(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+    val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
+    val sunLng = VectorLib.xyzToLng(sun2);
+    sunLng;
+  }
+  val termStrs = IndexedSeq(
+    "春分", "清明", "穀雨", "立夏", "小満", "芒種", "夏至", "小暑", "大暑", "立秋", "処暑", "白露",
+    "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒", "立春", "雨水", "啓蟄",
+  );
+  sunPhaseTerms.foreach { case (time, term) =>
+    if (term % 6 == 0) {
+      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
+    } else {
+      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "二十四節気の%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
+    }
+  }
+}
+
 // 日没時の西の空
 {
+  sealed trait OnSunsetTweetContent extends TweetContent {
+    def day: Int;
+    def message: String;
+    def hashtags: List[String];
+
+    def time: Double = sunsetTimes(day);
+  }
+
   sealed trait OnSunsetTweetContent2 extends OnSunsetTweetContent {
     def day: Int;
     def message: String;
@@ -1523,67 +1689,45 @@ def putTweet(tc: TweetContent): Unit = {
     // true: 近い, false: 遠い
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = if (flag) {
-      "満月。月が地球に近く、もっとも大きい満月です";
+      "満月 \uD83C\uDF15。月が地球に近く、もっとも大きい満月です";
     } else {
-      "満月。月が地球から遠く、もっとも小さい満月です";
+      "満月 \uD83C\uDF15。月が地球から遠く、もっとも小さい満月です";
     }
     def hashtags: List[String] = Nil;
   }
 
-  // TODO moonPhaseTerms に移行したい
-  (8 until (moonPhaseTerms2.size - 8)).foreach { i =>
-    val (time, term, distance) = moonPhaseTerms2(i);
-    putTweet(if (term == 4) {
-      if (moonPhaseTerms2(i - 8)._3 <= distance && distance > moonPhaseTerms2(i + 8)._3) {
+  {
+    val fullMoons = moonPhaseTerms.filter(_._2 == 4).map(_._1);
+    val fullMoonsDistanceMaxMinUpDownFlags = MathLib.getMaxMinUpDownFlagListDiscrete(0, fullMoons.size, 2) { idx =>
+      val utc = fullMoons(idx);
+      val tdb = TimeLib.mjdutcToTdb(utc);
+      val moon = jplData.calcMoonFromEarth(tdb);
+      VectorLib.distance(moon);
+    }
+    fullMoonsDistanceMaxMinUpDownFlags.zipWithIndex.map { case (flag, idx) =>
+      val time = fullMoons(idx);
+      if (flag == 1) {
         FullMoonDistanceTweetContent(time, false);
-      } else if (moonPhaseTerms2(i - 8)._3 >= distance && distance < moonPhaseTerms2(i + 8)._3) {
+      } else if (flag == 3) {
         FullMoonDistanceTweetContent(time, true);
       } else {
-        MoonPhaseTermTweetContent(time, term);
+        MoonPhaseTermTweetContent(time, 4);
       }
-    } else {
-      MoonPhaseTermTweetContent(time, term);
-    });
+    }.foreach(putTweet);
   }
+  moonPhaseTerms.filter(_._2 != 4).map { case (time, term) =>
+    MoonPhaseTermTweetContent(time, term);
+  }.foreach(putTweet);
 }
 
-val sunDistanceEventList: IndexedSeq[(Double, Int)] = Lib.findEvents2(startTime, endTime, 30, 24) { time =>
+MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcSunFromEarth(tdb);
   VectorLib.distance(sun);
-}
-
-val solarTerms: List[(Double, Int)] = {
-  def calcSunLng(time: Double): Double = {
-    val utc = time;
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
-    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
-    val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-    val sunLng = VectorLib.xyzToLng(sun2);
-    sunLng;
-  }
-  var solarTerms: List[(Double, Int)] = Nil;
-  var currTerm: Int = (calcSunLng(startTime) * 24 / PI2).toInt;
-  var nextStartTime: Double = startTime;
-  var nextRange: Int = 18;
-  while (nextStartTime >= 0.0 && nextStartTime < endTime) {
-    val nextTerm = if (currTerm == 23) 0 else currTerm + 1;
-    val nextTime = Lib.findCrossingBoundaryTime(nextTerm.toDouble * PI2 / 24, false, true,
-      nextStartTime, 24, nextRange * 24) { time =>
-      calcSunLng(time);
-    }
-    if (nextTime >= 0.0) {
-      solarTerms = (nextTime, nextTerm) :: solarTerms;
-      currTerm = nextTerm;
-      nextStartTime = TimeLib.floor(nextTime, 1) + 12.0;
-      nextRange = 6;
-    } else {
-      nextStartTime = -1.0;
-    }
-  }
-  solarTerms;
+}.foreach { case (time, flag) =>
+  val s = if (flag < 0) "近日点" else "遠日点";
+  putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
 }
 
 val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] = {
@@ -1631,7 +1775,7 @@ val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] 
       while (time - synodicPeriod5 < endTime || conjunctionEvents.size < 2) {
         time = TimeLib.floor(time, 1);
         val th = if (flag) PI else 0;
-        time = Lib.findCrossingBoundaryTime(th, true, true,
+        time = Lib2.findCrossingBoundaryTime(th, true, true,
           time - (synodicPeriod * 0.2).toInt, 24, (synodicPeriod * 0.4).toInt * 24) { time =>
           calcOuterPlanetLngEq(time, targetPlanet);
         }
@@ -1652,7 +1796,7 @@ val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] 
         val range = (range1 * 0.6).toInt;
         val term = conjunctionEvents2(i-1)._2 + 1;
         val th = if (term == 1) PI + PI5 else PI5;
-        val time2 = Lib.findCrossingBoundaryTime(th, true, true,
+        val time2 = Lib2.findCrossingBoundaryTime(th, true, true,
           time, 24, range * 24) { time =>
           calcOuterPlanetLngEq(time, targetPlanet);
         }
@@ -1684,7 +1828,7 @@ val planetPhase: List[(Double, String, String, Boolean, Option[Array[Double]])] 
     ("金星", JplData.Venus),
   ).foreach { t =>
     val (planetName, targetPlanet) = t;
-    Lib.findEvents3(startTime, endTime, 10.0, 24) { time =>
+    MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
       calcInnerPlanetLngEc(time, targetPlanet);
     }.foreach { case (time, term) =>
       if (term == 0) {
@@ -1759,33 +1903,6 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
 // ツイート文字列構築
 //==============================================================================
 
-case class LegacyTweetContent(time: Double, message: String) extends  TweetContent {
-  def hashtags: List[String] = Nil;
-}
-
-def putTweet(time: Double, msg: String): Unit = {
-  putTweet(LegacyTweetContent(time, msg));
-}
-
-sunDistanceEventList.foreach { case (time, flag) =>
-  val s = if (flag < 0) "近日点" else "遠日点";
-  putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
-}
-
-{
-  val termStrs = IndexedSeq(
-    "春分", "清明", "穀雨", "立夏", "小満", "芒種", "夏至", "小暑", "大暑", "立秋", "処暑", "白露",
-    "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒", "立春", "雨水", "啓蟄",
-  );
-  solarTerms.foreach { case (time, term) =>
-    if (term % 6 == 0) {
-      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
-    } else {
-      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "二十四節気の%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
-    }
-  }
-}
-
 planetPhase.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
   val time2 = if (timeFlag) {
     TimeLib.round(time, 24) - 1.0 / (24 * 4);
@@ -1825,10 +1942,10 @@ planetCons.foreach { case (time, planetName, xyz) =>
     ("05h17m", "ぎょしゃ座カペラは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
     ("05h55m", "オリオン座ベテルギウスは真南にいます。冬のダイヤモンドの中心の星です"),
     ("06h45m", "おおいぬ座シリウスは真南にいます。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("07h35m", "ふたご座の右側の明るい星カストルは天頂付近にいます。左側のポルックスよりよりやや暗いです"),
+    ("07h35m", "ふたご座の西側の明るい星カストルは天頂付近にいます。東側のポルックスよりよりやや暗いです"),
     ("07h39m", "こいぬ座プロキオンは真南にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("07h45m", "ふたご座の左側の明るい星ポルックスは天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("10h08m", "しし座の前足にあるレグルスは真南にいます"),
+    ("07h45m", "ふたご座の東側の明るい星ポルックスは天頂付近にいます。西側のカストルよりも明るく、冬のダイヤモンドを構成する6個の星の1つです"),
+    ("10h08m", "しし座の前足にあるレグルスは真南にいます。その東側にはしし座の尾のデネボラがいます"),
     ("11h49m", "しし座の尾にあるデネボラは真南にいます"),
     ("13h25m", "おとめ座スピカは真南にいます"),
     ("14h16m", "うしかい座アークトゥルスは真南の空高くにいます。シリウス、カノープスに次ぐ明るさの恒星です"),
