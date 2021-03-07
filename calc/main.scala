@@ -334,6 +334,20 @@ object VectorLib {
     Math.sqrt(x * x + y * y + z * z);
   }
 
+  def angularDistance1(xyz1: Array[Double], xyz2: Array[Double]): Double = {
+    val x1 = xyz1(0);
+    val y1 = xyz1(1);
+    val z1 = xyz1(2);
+    val x2 = xyz2(0);
+    val y2 = xyz2(1);
+    val z2 = xyz2(2);
+    (x1 * x2 + y1 * y2 + z1 * z2) / Math.sqrt((x1 * x1 + y1 * y1 + z1 * z1) * (x2 * x2 + y2 * y2 + z2 * z2));
+  }
+
+  def angularDistance(xyz1: Array[Double], xyz2: Array[Double]): Double = {
+    Math.acos(angularDistance1(xyz1, xyz2));
+  }
+
   val unitMatrix: Array[Double] = {
     val m = new Array[Double](9);
     m(0) = 1.0;
@@ -368,9 +382,9 @@ object VectorLib {
     ret(3) =  r(3);
     ret(4) =  r(4);
     ret(5) =  r(5);
-    ret(6) = -sin * r(0) + sin * r(6);
-    ret(7) = -sin * r(1) + sin * r(7);
-    ret(8) = -sin * r(2) + sin * r(8);
+    ret(6) = -sin * r(0) + cos * r(6);
+    ret(7) = -sin * r(1) + cos * r(7);
+    ret(8) = -sin * r(2) + cos * r(8);
     ret;
   }
 
@@ -457,6 +471,14 @@ object Bpn {
     (   -5.76 * 10e-7 +
     (   -4.34 * 10e-8)
     * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
+  }
+
+  val icrsToJ2000Matrix: Array[Double] = {
+    var r: Array[Double] = VectorLib.unitMatrix;
+    r = VectorLib.rotateMatrixX(  5.1 / 1000 / 3600 / PI57, r);
+    r = VectorLib.rotateMatrixY( 17.3 / 1000 / 3600 / PI57, r);
+    r = VectorLib.rotateMatrixZ(-78.0 / 1000 / 3600 / PI57, r);
+    r;
   }
 
   // ICRS座標系から平均黄道座標系に変換
@@ -1427,7 +1449,6 @@ val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, td
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(sun2, ut1);
       alt;
     }
-    val ut1 = time; // 近似的
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     (time, tdb, bpnMatrix);
@@ -1442,6 +1463,12 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
   val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
   val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
   hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+}
+
+def isNightTime(time: Double): Boolean = {
+  val day = (time - startTime).toInt;
+  val s = sunsetTimes(day);
+  time >= s && time - time.toInt < 17.0 / 24;
 }
 
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
@@ -1877,6 +1904,149 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
 }
 
 //==============================================================================
+// 月・惑星と恒星の会合
+//==============================================================================
+
+case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowStarName: String, fastStarName: String,
+  distance: Double, hashtags: List[String]) extends TweetContent {
+  def time: Double = TimeLib.round(rawTime, stepCountPerDay);
+  def message: String = "%sが%sに接近%s".format(fastStarName, slowStarName, distanceStr);
+  def distanceStr: String = {
+    val distance360 = distance * PI57;
+    if (distance360 < 1.0) {
+      " (1°未満)";
+    } else if (distance360 < 2.0) {
+      " (2°未満)";
+    } else if (distance360 < 3.0) {
+      " (3°未満)";
+    } else {
+      "";
+    }
+  }
+}
+
+{
+  val altThres0 = 10 / PI57;
+  val distanceThres = 10.0 / PI57;
+  val sun_distanceThres = 20.0 / PI57;
+
+  def calcClosest1(slowStarName: String, fastStarName: String, hashtags: List[String],
+    slowStarXyzFunc: Double => Array[Double],
+    fastStarXyzFunc: Double => Array[Double]): Unit = {
+    MathLib.findMaxMinListContinuous(startTime, endTime, 10.0, 24 * 6) { time =>
+      val utc = time;
+      val tdb = TimeLib.mjdutcToTdb(utc);
+      val xyz_s = slowStarXyzFunc(tdb);
+      val xyz_f = fastStarXyzFunc(tdb);
+      VectorLib.angularDistance1(xyz_s, xyz_f);
+    }.foreach { case (time, flag) =>
+      if (flag > 0 && isNightTime(time)) {
+        val ut1 = time; // 近似的
+        val tdb = TimeLib.mjdutcToTdb(time);
+        val xyz_f = fastStarXyzFunc(tdb);
+        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+        val xyz_f2 = VectorLib.multiplyMV(bpnMatrix, xyz_f);
+        val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz_f2, ut1);
+        if (alt >= altThres0) {
+          val xyz_s = slowStarXyzFunc(tdb);
+          val distance = VectorLib.angularDistance(xyz_s, xyz_f);
+          if (distance < distanceThres) {
+            putTweet(CloseStarsTweetContent(time, 24 * 6, slowStarName, fastStarName, distance, hashtags));
+          }
+        }
+      }
+    }
+  }
+  def calcClosest2(slowStarName: String, fastStarName: String, hashtags: List[String],
+    slowStarXyzFunc: Double => Array[Double],
+    fastStarXyzFunc: Double => Array[Double]): Unit = {
+    MathLib.findMaxMinListContinuous(startTime, endTime, 10.0, 24) { time =>
+      val utc = time;
+      val tdb = TimeLib.mjdutcToTdb(utc);
+      val xyz_s = slowStarXyzFunc(tdb);
+      val xyz_f = fastStarXyzFunc(tdb);
+      VectorLib.angularDistance1(xyz_s, xyz_f);
+    }.foreach { case (time, flag) =>
+      if (flag > 0) {
+        val ut1 = time; // 近似的
+        val tdb = TimeLib.mjdutcToTdb(time);
+        val xyz_f = fastStarXyzFunc(tdb);
+        val xyz_s = slowStarXyzFunc(tdb);
+        val distance = VectorLib.angularDistance(xyz_s, xyz_f);
+        if (distance < distanceThres) {
+          val sun_xyz = jplData.calcSunFromEarth(tdb);
+          val sun_distance = VectorLib.angularDistance(sun_xyz, xyz_f);
+          if (sun_distance >= sun_distanceThres) {
+            //TODO
+            //putTweet(CloseStarsTweetContent(time, 24, slowStarName, fastStarName, distance, hashtags));
+          }
+        }
+      }
+    }
+  }
+
+  val stars0: IndexedSeq[(String, Array[Double])] = IndexedSeq(
+    ("03h47m", "+24°06′", "おうし座すばる"),
+    ("04h36m", "+16°31′", "おうし座アルデバラン"),
+    ("07h45m", "+28°02′", "ふたご座ポルックス"),
+    ("10h08m", "+11°58′", "しし座レグルス"),
+    ("13h25m", "-11°09′", "おとめ座スピカ"),
+    ("16h29m", "-26°26′", "さそり座アンタレス"),
+  ).map { case (lngStr, latStr, name) =>
+    val lng = (lngStr.substring(0, 2).toInt.toDouble + lngStr.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
+    val lat = (latStr.substring(0, 3).toInt.toDouble + latStr.substring(4, 6).toInt.toDouble / 60) / 360 * PI2;
+    val c = Math.cos(lat);
+    val x = c * Math.cos(lng);
+    val y = c * Math.sin(lng);
+    val z = Math.sin(lat);
+    (name, Array(x, y, z));
+  }
+  val stars1 = IndexedSeq(
+    ("水星", JplData.Mercury),
+    ("金星", JplData.Venus),
+    ("火星", JplData.Mars),
+    ("木星", JplData.Jupiter),
+    ("土星", JplData.Saturn),
+  );
+  val stars2 = IndexedSeq(
+    ("月", JplData.Moon),
+  );
+  stars2.foreach { star2 =>
+    stars0.foreach { star0 =>
+      calcClosest1(star0._1, star2._1, Nil,
+        { tdb: Double =>
+          star0._2;
+        },
+        { tdb: Double =>
+          jplData.calcPlanetFromEarth(tdb, star2._2);
+        });
+    }
+  }
+  stars2.foreach { star2 =>
+    stars1.foreach { star1 =>
+      calcClosest1(star1._1, star2._1, List(star1._1),
+        { tdb: Double =>
+          jplData.calcPlanetFromEarth(tdb, star1._2);
+        },
+        { tdb: Double =>
+          jplData.calcPlanetFromEarth(tdb, star2._2);
+        });
+    }
+  }
+  stars1.foreach { star1 =>
+    stars0.foreach { star0 =>
+      calcClosest2(star0._1, star1._1, Nil,
+        { tdb: Double =>
+          star0._2;
+        },
+        { tdb: Double =>
+          jplData.calcPlanetFromEarth(tdb, star1._2);
+        });
+    }
+  }
+}
+
+//==============================================================================
 // 21時・23時の惑星
 //==============================================================================
 
@@ -2008,10 +2178,10 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay:
     }
   }
 }
-tweetConstellations(Constellations.ecliptical, 14, 11);
-tweetConstellations(Constellations.winter, 7, 11);
+tweetConstellations(Constellations.ecliptical, 14, 59);
+tweetConstellations(Constellations.winter, 7, 36);
 tweetConstellations(Constellations.summer, 7, 11);
-tweetConstellations(Constellations.northern, 14, 11);
+tweetConstellations(Constellations.northern, 14, 39);
 
 //==============================================================================
 // なにもツイートのない日付をエラー出力
