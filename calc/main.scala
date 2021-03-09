@@ -766,182 +766,182 @@ class Hcs(lng: Double, lat: Double) {
 }
 
 object Constellations {
-  val constellationsMap = Map (
-    " 0h00m, -5" -> "うお座の西側の魚(ペガスス座の南)の南",
+  val constellationsMap = Map[String, (String, List[String])] (
+    " 0h00m, -5" -> ("うお座の西側の魚(ペガスス座の南)の南", Nil),
 
-    " 0h20m, -5" -> "くじら座のしっぽ付近",
+    " 0h20m, -5" -> ("くじら座のしっぽ付近", Nil),
 
-    " 1h00m,  0" -> "うお座の西側の魚(ペガスス座の南)のしっぽ付近",
+    " 1h00m,  0" -> ("うお座の西側の魚(ペガスス座の南)のしっぽ付近", Nil),
 
-    " 1h20m, 10" -> "うお座の東側の魚(アンドロメダ座の南)のしっぽ付近",
+    " 1h20m, 10" -> ("うお座の東側の魚(アンドロメダ座の南)のしっぽ付近", Nil),
 
-    " 1h40m,  5" -> "うお座の2匹の魚の付け根付近",
-    " 1h40m, 10" -> "うお座の東側の魚(アンドロメダ座の南)のしっぽ付近",
+    " 1h40m,  5" -> ("うお座の2匹の魚の付け根付近", Nil),
+    " 1h40m, 10" -> ("うお座の東側の魚(アンドロメダ座の南)のしっぽ付近", Nil),
 
-    " 2h00m,  5" -> "くじら座の頭付近",
-    " 2h00m, 10" -> "おひつじ座の頭とくじら座の頭の間",
-    " 2h00m, 15" -> "おひつじ座の頭付近",
+    " 2h00m,  5" -> ("くじら座の頭付近", Nil),
+    " 2h00m, 10" -> ("おひつじ座の頭とくじら座の頭の間", Nil),
+    " 2h00m, 15" -> ("おひつじ座の頭付近", Nil),
 
-    " 2h20m, 10" -> "おひつじ座とくじら座の頭の間",
-    " 2h20m, 15" -> "おひつじ座の南",
+    " 2h20m, 10" -> ("おひつじ座とくじら座の頭の間", Nil),
+    " 2h20m, 15" -> ("おひつじ座の南", Nil),
 
-    " 2h40m, 10" -> "おひつじ座とくじら座の頭の間",
-    " 2h40m, 15" -> "おひつじ座の南",
+    " 2h40m, 10" -> ("おひつじ座とくじら座の頭の間", Nil),
+    " 2h40m, 15" -> ("おひつじ座の南", Nil),
 
-    " 3h00m, 15" -> "おひつじ座のしっぽ側",
+    " 3h00m, 15" -> ("おひつじ座のしっぽ側", Nil),
 
-    " 3h20m, 15" -> "おうし座の西",
-    " 3h20m, 20" -> "おうし座すばる付近",
+    " 3h20m, 15" -> ("おうし座の西", Nil),
+    " 3h20m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
 
-    " 3h40m, 15" -> "おうし座すばるの南",
-    " 3h40m, 20" -> "おうし座すばる付近",
+    " 3h40m, 15" -> ("おうし座すばるの南", List("プレアデス星団")),
+    " 3h40m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
 
-    " 4h00m, 15" -> "おうし座ヒアデスの西",
-    " 4h00m, 20" -> "おうし座すばる付近",
+    " 4h00m, 15" -> ("おうし座ヒアデスの西", Nil),
+    " 4h00m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
 
-    " 4h20m, 20" -> "おうし座とペルセウス座とぎょしゃ座の間",
+    " 4h20m, 20" -> ("おうし座とペルセウス座とぎょしゃ座の間", Nil),
 
-    " 4h40m, 20" -> "おうし座ヒアデスの北東",
+    " 4h40m, 20" -> ("おうし座ヒアデスの北東", Nil),
 
-    " 5h00m, 20" -> "おうし座の角付近",
+    " 5h00m, 20" -> ("おうし座の角付近", Nil),
 
-    " 5h20m, 20" -> "おうし座の角とぎょしゃ座付近",
+    " 5h20m, 20" -> ("おうし座の角とぎょしゃ座付近", Nil),
 
-    " 5h40m, 20" -> "おうし座の角とオリオン座の腕付近",
+    " 5h40m, 20" -> ("おうし座の角とオリオン座の腕付近", Nil),
 
-    " 6h00m, 20" -> "ふたご座の西側の子の足元とオリオン座の腕付近",
+    " 6h00m, 20" -> ("ふたご座の西側の子の足元とオリオン座の腕付近", Nil),
 
-    " 6h20m, 20" -> "ふたご座の西側の子の足元付近",
-    " 6h20m, 25" -> "ふたご座の西側の子の腰付近",
+    " 6h20m, 20" -> ("ふたご座の西側の子の足元付近", Nil),
+    " 6h20m, 25" -> ("ふたご座の西側の子の腰付近", Nil),
 
-    " 6h40m, 20" -> "ふたご座の2人の足元付近",
-    " 6h40m, 25" -> "ふたご座の西側の子の胴体付近",
+    " 6h40m, 20" -> ("ふたご座の2人の足元付近", Nil),
+    " 6h40m, 25" -> ("ふたご座の西側の子の胴体付近", Nil),
 
-    " 7h00m, 20" -> "ふたご座の東側の子の腰付近",
-    " 7h00m, 25" -> "ふたご座の西側の子の胴体付近",
+    " 7h00m, 20" -> ("ふたご座の東側の子の腰付近", Nil),
+    " 7h00m, 25" -> ("ふたご座の西側の子の胴体付近", Nil),
 
-    " 7h20m, 20" -> "ふたご座の東側の子の胴体付近",
-    " 7h20m, 25" -> "ふたご座の東側の子の胴体付近",
+    " 7h20m, 20" -> ("ふたご座の東側の子の胴体付近", Nil),
+    " 7h20m, 25" -> ("ふたご座の東側の子の胴体付近", Nil),
 
-    " 7h40m, 20" -> "ふたご座ポルックスの南でふたご座の東",
+    " 7h40m, 20" -> ("ふたご座ポルックスの南でふたご座の東", Nil),
 
-    " 8h00m, 20" -> "かに座の西",
+    " 8h00m, 20" -> ("かに座の西", Nil),
 
-    " 8h20m, 20" -> "かに座",
+    " 8h20m, 20" -> ("かに座", Nil),
 
-    " 8h40m, 20" -> "かに座",
+    " 8h40m, 20" -> ("かに座", Nil),
 
-    " 9h00m, 20" -> "かに座の東",
+    " 9h00m, 20" -> ("かに座の東", Nil),
 
-    " 9h20m, 15" -> "しし座とかに座の間",
+    " 9h20m, 15" -> ("しし座とかに座の間", Nil),
 
-    " 9h40m, 15" -> "しし座の西",
+    " 9h40m, 15" -> ("しし座の西", Nil),
 
-    "10h00m, 15" -> "しし座の肩付近",
+    "10h00m, 15" -> ("しし座の肩付近", Nil),
 
-    "10h20m, 10" -> "しし座レグルスの東",
-    "10h20m, 15" -> "しし座の中央",
+    "10h20m, 10" -> ("しし座レグルスの東", Nil),
+    "10h20m, 15" -> ("しし座の中央", Nil),
 
-    "10h40m, 10" -> "しし座の腹付近",
+    "10h40m, 10" -> ("しし座の腹付近", Nil),
 
-    "11h00m, 10" -> "しし座の後ろ足付近",
+    "11h00m, 10" -> ("しし座の後ろ足付近", Nil),
 
-    "11h20m,  5" -> "しし座の後ろ足とおとめ座の間",
+    "11h20m,  5" -> ("しし座の後ろ足とおとめ座の間", Nil),
 
-    "11h40m,  5" -> "おとめ座の頭付近",
+    "11h40m,  5" -> ("おとめ座の頭付近", Nil),
 
-    "12h00m,  0" -> "おとめ座の四角形の西",
-    "12h00m,  5" -> "おとめ座の頭付近",
+    "12h00m,  0" -> ("おとめ座の四角形の西", Nil),
+    "12h00m,  5" -> ("おとめ座の頭付近", Nil),
 
-    "12h20m,  0" -> "おとめ座の四角形の西",
+    "12h20m,  0" -> ("おとめ座の四角形の西", Nil),
 
-    "12h40m,  0" -> "おとめ座の四角形",
-    "12h40m, -5" -> "おとめ座の四角形",
+    "12h40m,  0" -> ("おとめ座の四角形", Nil),
+    "12h40m, -5" -> ("おとめ座の四角形", Nil),
 
-    "13h00m, -5" -> "おとめ座の四角形",
+    "13h00m, -5" -> ("おとめ座の四角形", Nil),
 
-    "13h20m, -5" -> "おとめ座スピカの北",
-    "13h20m,-10" -> "おとめ座スピカの北",
+    "13h20m, -5" -> ("おとめ座スピカの北", Nil),
+    "13h20m,-10" -> ("おとめ座スピカの北", Nil),
 
-    "13h40m,-10" -> "おとめ座スピカの東",
+    "13h40m,-10" -> ("おとめ座スピカの東", Nil),
 
-    "14h00m,-10" -> "おとめ座スピカの東",
-    "14h00m,-15" -> "おとめ座スピカとてんびん座の間",
+    "14h00m,-10" -> ("おとめ座スピカの東", Nil),
+    "14h00m,-15" -> ("おとめ座スピカとてんびん座の間", Nil),
 
-    "14h20m,-15" -> "てんびん座の西おとめ座との間",
+    "14h20m,-15" -> ("てんびん座の西おとめ座との間", Nil),
 
-    "14h40m,-15" -> "てんびん座の西",
+    "14h40m,-15" -> ("てんびん座の西", Nil),
 
-    "15h00m,-20" -> "てんびん座",
+    "15h00m,-20" -> ("てんびん座", Nil),
 
-    "15h20m,-20" -> "てんびん座",
+    "15h20m,-20" -> ("てんびん座", Nil),
 
-    "15h40m,-20" -> "てんびん座の東さそり座との間",
+    "15h40m,-20" -> ("てんびん座の東さそり座との間", Nil),
 
-    "16h00m,-25" -> "さそり座アンタレスの北西",
+    "16h00m,-25" -> ("さそり座アンタレスの北西", Nil),
 
-    "16h20m,-25" -> "へびつかい座でさそり座アンタレスの北",
+    "16h20m,-25" -> ("へびつかい座でさそり座アンタレスの北", Nil),
 
-    "16h40m,-25" -> "へびつかい座でさそり座アンタレスの北東",
+    "16h40m,-25" -> ("へびつかい座でさそり座アンタレスの北東", Nil),
 
-    "17h00m,-25" -> "へびつかい座でさそり座アンタレスの東",
+    "17h00m,-25" -> ("へびつかい座でさそり座アンタレスの東", Nil),
 
-    "17h20m,-25" -> "へびつかい座でさそり座アンタレスの東",
+    "17h20m,-25" -> ("へびつかい座でさそり座アンタレスの東", Nil),
 
-    "17h40m,-30" -> "いて座さそり座へびつかい座の間",
+    "17h40m,-30" -> ("いて座さそり座へびつかい座の間", Nil),
 
-    "18h00m,-30" -> "いて座の西",
+    "18h00m,-30" -> ("いて座の西", Nil),
 
-    "18h20m,-30" -> "いて座南斗六星",
+    "18h20m,-30" -> ("いて座南斗六星", Nil),
 
-    "18h40m,-30" -> "いて座南斗六星",
+    "18h40m,-30" -> ("いて座南斗六星", Nil),
 
-    "19h00m,-30" -> "いて座南斗六星の先",
+    "19h00m,-30" -> ("いて座南斗六星の先", Nil),
 
-    "19h20m,-30" -> "いて座南斗六星の東",
+    "19h20m,-30" -> ("いて座南斗六星の東", Nil),
 
-    "20h00m,-25" -> "やぎ座の西部",
+    "20h00m,-25" -> ("やぎ座の西部", Nil),
 
-    "20h20m,-20" -> "やぎ座の西部",
+    "20h20m,-20" -> ("やぎ座の西部", Nil),
 
-    "20h40m,-20" -> "やぎ座の中央",
-    "20h40m,-25" -> "やぎ座の中央",
+    "20h40m,-20" -> ("やぎ座の中央", Nil),
+    "20h40m,-25" -> ("やぎ座の中央", Nil),
 
-    "21h00m,-20" -> "やぎ座の中央",
-    "21h00m,-25" -> "やぎ座の中央",
+    "21h00m,-20" -> ("やぎ座の中央", Nil),
+    "21h00m,-25" -> ("やぎ座の中央", Nil),
 
-    "21h40m,-15" -> "やぎ座とみずがめ座の間",
-    "21h40m,-20" -> "やぎ座の東部",
+    "21h40m,-15" -> ("やぎ座とみずがめ座の間", Nil),
+    "21h40m,-20" -> ("やぎ座の東部", Nil),
 
-    "22h00m,-20" -> "みずがめ座の南部でやぎ座の東",
-    "22h00m,-15" -> "みずがめ座の南部でやぎ座の東",
+    "22h00m,-20" -> ("みずがめ座の南部でやぎ座の東", Nil),
+    "22h00m,-15" -> ("みずがめ座の南部でやぎ座の東", Nil),
 
-    "22h20m,-15" -> "みずがめ座の南部でやぎ座の東",
+    "22h20m,-15" -> ("みずがめ座の南部でやぎ座の東", Nil),
 
-    "22h40m,-15" -> "みずがめ座の南部でうお座の西側の魚の頭の南西",
+    "22h40m,-15" -> ("みずがめ座の南部でうお座の西側の魚の頭の南西", Nil),
 
-    "23h00m,-15" -> "みずがめ座の南部でうお座の西側の魚の頭の南",
+    "23h00m,-15" -> ("みずがめ座の南部でうお座の西側の魚の頭の南", Nil),
 
-    "23h20m,-10" -> "みずがめ座とうお座の西側の魚の頭の間",
+    "23h20m,-10" -> ("みずがめ座とうお座の西側の魚の頭の間", Nil),
 
-    "23h40m,-10" -> "みずがめ座とうお座の西側の魚の頭の間",
+    "23h40m,-10" -> ("みずがめ座とうお座の西側の魚の頭の間", Nil),
   );
 
-  def icrsToConstellation(lng: Double, lat: Double): (String, String) = {
+  def icrsToConstellation(lng: Double, lat: Double): (String, String, List[String]) = {
     val lng5 = (lng * PI57 / 5).toInt * 5;
     val lat5 = ((lat * PI57 + 90) / 5).toInt * 5 - 90;
     val key = "%2dh%02dm,%3d".format(lng5 / 15, lng5 % 15 * 4, lat5);
-    val cons = constellationsMap.getOrElse(key, "-");
+    val (cons, hashtags) = constellationsMap.getOrElse(key, ("-", Nil));
     if (cons == "") {
-      ("#", "(%s)".format(key));
+      ("#", "(%s)".format(key), hashtags);
     } else if (cons == "-") {
-      ("##", "(%s)".format(key));
+      ("##", "(%s)".format(key), hashtags);
     } else {
-      ("", cons);
+      ("", cons, hashtags);
     }
   }
 
-  def icrsToConstellation(xyz: Array[Double]): (String, String) = {
+  def icrsToConstellation(xyz: Array[Double]): (String, String, List[String]) = {
     val lng = VectorLib.xyzToLng(xyz);
     val lat = VectorLib.xyzToLat(xyz);
     icrsToConstellation(lng, lat);
@@ -963,35 +963,13 @@ object Constellations {
     ("24h00m", ""),
   );
 
-  val northern = IndexedSeq(
-    ("00h00m", "この時期の北の空は、北極星の上にカシオペア座がいます"),
-    ("02h00m", "この時期の北の空は、北極星の11時の方向(左上)にカシオペア座がいます"),
-    ("04h00m", "この時期の北の空は、北極星の10時の方向(左上)にカシオペア座がいます"),
-    ("05h00m", "この時期の北の空は、北極星の10時の方向(左上)にカシオペア座、右に北斗七星がいます"),
-    ("06h00m", "この時期の北の空は、北極星の左にカシオペア座、右に北斗七星がいます"),
-    ("07h00m", "この時期の北の空は、北極星の2時の方向(右上)に北斗七星がいます"),
-    ("09h00m", "この時期の北の空は、北極星の1時の方向(右上)に北斗七星がいます"),
-    ("11h00m", "この時期の北の空は、北極星の上に北斗七星がいます"),
-    ("13h00m", "この時期の北の空は、北極星の11時の方向(左上)に北斗七星がいます"),
-    ("15h00m", "この時期の北の空は、北極星の10時の方向(左上)に北斗七星がいます"),
-    ("17h00m", "この時期の北の空は、北極星の左に北斗七星がいます"),
-    ("18h00m", "この時期の北の空は、北極星の左に北斗七星、右にカシオペア座がいます"),
-    ("20h00m", "この時期の北の空は、北極星の2時の方向(右上)にカシオペア座がいます"),
-    ("22h00m", "この時期の北の空は、北極星の1時の方向(右上)にカシオペア座がいます"),
-    ("24h00m", ""),
-  );
-
-  val winter = IndexedSeq(
+  val season = IndexedSeq(
     ("01h00m", "冬のダイヤモンドは東の空から昇ってきています"),
     ("03h00m", "冬のダイヤモンドは南東の空にいます"),
     ("04h40m", "冬のダイヤモンドは南の空高くにいます"),
     ("07h20m", "冬のダイヤモンドは南西の空にいます"),
     ("09h00m", "冬のダイヤモンドは西の空に沈みかけています"),
     ("11h00m", ""),
-    ("24h00m", ""),
-  );
-
-  val summer = IndexedSeq(
     ("16h20m", "夏の大三角形は東の空にいます"),
     ("17h20m", "夏の大三角形は東の空高くにいます"),
     ("18h00m", "夏の大三角形は頭上空高くにいます"),
@@ -1483,6 +1461,12 @@ val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
 
 //==============================================================================
 
+def isNightTime0(time: Double): Boolean = {
+  val day = (time - startTime).toInt;
+  val s = sunsetTimes(day);
+  time - time.toInt >= 3.0 / 24 && time - time.toInt < 15.0 / 24;
+}
+
 def isNightTime1(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
@@ -1547,12 +1531,13 @@ case class LegacyTweetContent(time: Double, message: String) extends  TweetConte
 case class DateTweets(otherTweets: List[TweetContent], sunsetTweets: List[OnSunsetTweetContent],
   nightTweets: List[TweetContent]) {
   def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && nightTweets.isEmpty;
+  def isEmpty2: Boolean = sunsetTweets.isEmpty && nightTweets.isEmpty;
   def added(tc: TweetContent): DateTweets = {
     tc match {
       case tc: OnSunsetTweetContent =>
         this.copy(sunsetTweets = tc :: this.sunsetTweets);
       case _ =>
-        if (isNightTime1(tc.time)) {
+        if (isNightTime0(tc.time)) {
           this.copy(nightTweets = tc :: this.nightTweets);
         } else {
           this.copy(otherTweets = tc :: this.otherTweets);
@@ -1825,18 +1810,23 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
     "下弦の月\uD83C\uDF17",
     "月相 7/8。下弦と新月の中間です\uD83C\uDF18",
   );
-  case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, cons: Option[(String, String)]) extends TweetContent {
+  case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, cons: Option[(String, String, List[String])]) extends TweetContent {
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = {
       cons match {
-        case Some((conscomment, cons)) => "%s%s。%sにいます".format(conscomment, termStrs(term), cons);
+        case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます".format(conscomment, termStrs(term), cons);
         case None => termStrs(term);
       }
     }
-    def hashtags: List[String] = Nil;
+    def hashtags: List[String] = {
+      cons match {
+        case Some((conscomment, cons, hashtags)) => hashtags;
+        case None => Nil;
+      }
+    }
     def starNames: List[String] = List("月");
   }
-  case class FullMoonDistanceTweetContent(rawTime: Double, flag: Boolean, cons: Option[(String, String)]) extends TweetContent {
+  case class FullMoonDistanceTweetContent(rawTime: Double, flag: Boolean, cons: Option[(String, String, List[String])]) extends TweetContent {
     // true: 近い, false: 遠い
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = {
@@ -1846,17 +1836,22 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
         "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です";
       }
       cons match {
-        case Some((conscomment, cons)) => "%s%s。%sにいます".format(conscomment, msg, cons);
+        case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます".format(conscomment, msg, cons);
         case None => msg;
       }
     }
-    def hashtags: List[String] = Nil;
+    def hashtags: List[String] = {
+      cons match {
+        case Some((conscomment, cons, hashtags)) => hashtags;
+        case None => Nil;
+      }
+    }
     def starNames: List[String] = List("月");
   }
 
   val altThres0 = 10 / PI57;
 
-  def calcMoonConstellation(time: Double): Option[(String, String)] = {
+  def calcMoonConstellation(time: Double): Option[(String, String, List[String])] = {
     if (isNightTime2(time)) {
       val ut1 = time; // 近似的
       val tdb = TimeLib.mjdutcToTdb(time);
@@ -1865,8 +1860,8 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
       if (alt >= altThres0) {
-        val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-        Some((conscomment, cons));
+        val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+        Some((conscomment, cons, hashtags));
       } else {
         None;
       }
@@ -1999,8 +1994,9 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
     case None =>
       putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
     case Some(xyz) =>
-      val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-      putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName));
+      val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+      putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName) +
+        hashtags.map(" #" + _).mkString);
     }
   }
 }
@@ -2205,12 +2201,14 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
 }
 
 moonCons.foreach { case (time, xyz) =>
-  val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 6), "%s月は%sにいます".format(conscomment, cons));
+  val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 6), "%s月は%sにいます".format(conscomment, cons) +
+    hashtags.map(" #" + _).mkString);
 }
 planetCons.foreach { case (time, planetName, xyz) =>
-  val (conscomment, cons) = Constellations.icrsToConstellation(xyz);
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName));
+  val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName) +
+    hashtags.map(" #" + _).mkString);
 }
 
 //==============================================================================
@@ -2244,54 +2242,6 @@ manualTweet.split("\n").foreach { line =>
 // 星座
 //==============================================================================
 
-{
-  case class StarTweetContent(time: Double, message: String) extends TweetContent {
-    def hashtags: List[String] = List("星空");
-    def starNames: List[String] = Nil;
-  }
-  val stars = IndexedSeq(
-    // J2000
-    ("00h11m", "ペガスス座の四角形の左の辺が南中"),
-    ("03h47m", "おうし座すばるが南中。天頂付近にいます"),
-    ("04h36m", "おうし座アルデバランが南中。南の空高くにいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("05h15m", "オリオン座リゲルが南中。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("05h17m", "ぎょしゃ座カペラが南中。天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("05h55m", "オリオン座ベテルギウスが南中。冬のダイヤモンドの中心の星です"),
-    ("06h45m", "おおいぬ座シリウスが南中。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("07h35m", "ふたご座の西側の明るい星カストルが南中。天頂付近にいます。東側のポルックスよりよりやや暗いです"),
-    ("07h39m", "こいぬ座プロキオンが南中。冬のダイヤモンドを構成する6個の星の1つです"),
-    ("07h45m", "ふたご座の東側の明るい星ポルックスが南中。天頂付近にいます。西側のカストルよりも明るく、冬のダイヤモンドを構成する6個の星の1つです"),
-    ("10h08m", "しし座の前足にあるレグルスが南中。その東側にはしし座の尾のデネボラがいます"),
-    ("11h49m", "しし座の尾にあるデネボラが南中。その西側にはしし座の前足のレグルスがいます"),
-    ("13h25m", "おとめ座スピカが南中"),
-    ("14h16m", "うしかい座アークトゥルスが南中。南の空高くにいます。シリウス、カノープスに次ぐ明るさの恒星です"),
-    ("16h29m", "さそり座アンタレスが南中"),
-    ("18h37m", "こと座ベガが南中。天頂付近にいます。夏の大三角形の1つです"),
-    ("19h51m", "わし座アルタイルが南中。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます"),
-    ("20h41m", "はくちょう座デネブが南中。天頂付近にいます。夏の大三角形の1つです"),
-    ("23h04m", "ペガスス座の四角形の右の辺が南中"),
-  ).map { t =>
-    ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2, t._2);
-  }
-  var index = -1;
-  (0 until period).foreach { day =>
-    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-    val time = startTime + day + 21.0 / 24.0;
-    val sid = hcs.siderealTime(time);
-    if (index < 0) {
-      index = stars.indexWhere(_._1 > sid);
-    } else {
-      if (sid > stars(index)._1 && (index > 0 || sid < PI)) {
-        putTweet(StarTweetContent(time, stars(index)._2));
-        index += 1;
-        if (index == stars.size) {
-          index = 0;
-        }
-      }
-    }
-  }
-}
-
 def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay: Int): Unit = {
   val hashtag = " #星空";
   var nextDay: Int = startDay;
@@ -2308,10 +2258,111 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay:
     }
   }
 }
-tweetConstellations(Constellations.ecliptical, 14, 59);
-tweetConstellations(Constellations.winter, 7, 36);
-tweetConstellations(Constellations.summer, 7, 162);
-tweetConstellations(Constellations.northern, 14, 39);
+//tweetConstellations(Constellations.ecliptical, 14, 59);
+tweetConstellations(Constellations.season, 7, 36);
+//tweetConstellations(Constellations.northern, 14, 39);
+
+{
+  import Ordering.Double.IeeeOrdering;
+  case class StarTweetContent(time: Double, message: String, hashtags2: List[String]) extends TweetContent {
+    def hashtags: List[String] = "星空" :: hashtags2;
+    def starNames: List[String] = Nil;
+  }
+  val stars = IndexedSeq(
+    // J2000
+    ("00h11m", "ペガスス座の四角形の左の辺が南中", Nil),
+    ("03h47m", "おうし座すばるが南中。天頂付近にいます", List("プレアデス星団")),
+    ("04h36m", "おうし座アルデバランが南中。南の空高くにいます。冬のダイヤモンドを構成する6個の星の1つです", Nil),
+    ("05h15m", "オリオン座リゲルが南中。冬のダイヤモンドを構成する6個の星の1つです", Nil),
+    ("05h17m", "ぎょしゃ座カペラが南中。天頂付近にいます。冬のダイヤモンドを構成する6個の星の1つです", Nil),
+    ("05h55m", "オリオン座ベテルギウスが南中。冬のダイヤモンドの中心の星です", Nil),
+    ("06h45m", "おおいぬ座シリウスが南中。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです", Nil),
+    ("07h35m", "ふたご座の西側の明るい星カストルが南中。天頂付近にいます。東側のポルックスよりよりやや暗いです", Nil),
+    ("07h39m", "こいぬ座プロキオンが南中。冬のダイヤモンドを構成する6個の星の1つです", Nil),
+    ("07h45m", "ふたご座の東側の明るい星ポルックスが南中。天頂付近にいます。西側のカストルよりも明るく、冬のダイヤモンドを構成する6個の星の1つです", Nil),
+    ("10h08m", "しし座の前足にあるレグルスが南中。東(左)にはしし座の尾のデネボラがいます", Nil),
+    ("11h49m", "しし座の尾にあるデネボラが南中。おとめ座スピカ、うしかい座アークトゥルスとともに春の大三角形を構成します。西(右)にはしし座の前足のレグルスがいます", Nil),
+    ("13h25m", "おとめ座スピカが南中。しし座デネボラ、うしかい座アークトゥルスとともに春の大三角形を構成します", Nil),
+    ("14h16m", "うしかい座アークトゥルスが南中。南の空高くにいます。しし座デネボラ、おとめ座スピカとともに春の大三角形を構成します。全天でシリウス、カノープスに次ぐ明るさの恒星です", Nil),
+    ("16h29m", "さそり座アンタレスが南中", Nil),
+    ("18h37m", "こと座ベガが南中。天頂付近にいます。夏の大三角形の1つです", Nil),
+    ("19h51m", "わし座アルタイルが南中。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます", Nil),
+    ("20h41m", "はくちょう座デネブが南中。天頂付近にいます。夏の大三角形の1つです", Nil),
+    ("22h48m", "みなみのうお座フォーマルハウトが南中", Nil),
+    ("23h04m", "ペガスス座の四角形の右の辺が南中", Nil),
+
+    ("09h21m", "やまねこ座α(3等星)が南中。やまねこ座は、ぎょしゃ座・ふたご座・かに座とおおぐま座の隙間にある目立たない星座で、見つけるにはヤマネコのような暗視能力が必要だとも", Nil),
+    ("10h53m", "こじし座で一番明るい星「46番星」(4等星)が南中。こじし座は、しし座の頭とおおぐま座の隙間にある目立たない星座です。小さな獅子(しし)の意味", Nil),
+    ("08h55m", "うみへび座の頭にある星ζ(3等星)が南中。うみへび座の頭はかに座の南(下)にあります。うみへび座は、全天でもっとも大きな星座で、東西に長く、しっぽはてんびん座付近です", Nil),
+    ("09h28m", "うみへび座α(2等星)が南中。しし座レグルスの南西(右下)です。うみへび座は、全天でもっとも大きな星座で、東西に長く、頭はかに座付近、しっぽはてんびん座付近です", Nil),
+    ("13h19m", "うみへび座γ(3等星)が南中。おとめ座スピカの南(下)です。うみへび座は、全天でもっとも大きな星座で、東西に長く、頭はかに座付近、しっぽはてんびん座付近です", Nil),
+    ("10h24m", "ろくぶんぎ座が南中。ろくぶんぎ座は、しし座レグルスの南(下)、うみへび座αの東(左)にある目立たない星座です", Nil),
+    ("11h19m", "コップ座が南中。コップ座は、しし座の後ろ足の南(下)、からす座の西(右)にある目立たない星座です。コップというよりは杯です", Nil),
+    ("12h23m", "からす座が南中。からす座は、おとめ座スピカの南西(右下)にある目立たない星座です", Nil),
+    ("12h23m", "かみのけ座の散開星団が南中。かみのけ座は、しし座デネボラの北東(左上)、うしかい座アークトゥルスの西(右)にある散開星団を中心とした目立たない星座で、銀河北極点に位置します。かみのけ座銀河団もあります", Nil),
+    ("12h56m", "りょうけん座が南中。りょうけん座は、北斗七星の柄の部分の南にある目立たない星座です。北斗七星の柄の端、かみのけ座3等星コル・カロリ、かみのけ座の散開星団、しし座デネボラの4つが直線で等間隔で並んでいます", Nil),
+
+    ("15h35m", "かんむり座αが南中。かんむり座は、西のうしかい座と東のヘラクレス座に挟まれ、へび座の頭の北にあります。唯一の2等星αを中心に小さなはっきりとした半円形のかんむりを描いています", Nil),
+    ("15h44m", "へび座α(3等星)が南中。へび座の頭にある星です", Nil),
+
+    ("00h50m", "この時期に南の空にいる黄道十二星座はうお座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座、ふたご座の順に並んでいます", Nil),
+    ("02h40m", "この時期に南の空にいる黄道十二星座はおひつじ座です。西から東に順番に、みずがめ座、うお座、おひつじ座、おうし座、ふたご座、かに座の順に並んでいます", Nil),
+    ("04h30m", "この時期に南の空高くにいる黄道十二星座はおうし座です。西から東に順番に、うお座、おひつじ座、おうし座、ふたご座、かに座、の順に並んでいます", Nil),
+    ("07h00m", "この時期に南の空高くにいる黄道十二星座はふたご座です。西から東に順番に、おひつじ座、おうし座、ふたご座、かに座、しし座の順に並んでいます", Nil),
+    //("08h40m", "この時期に南の空高くにいる黄道十二星座はかに座です。西から東に順番に、おうし座、ふたご座、かに座、しし座、おとめ座の順に並んでいます", Nil),
+    ("10h40m", "この時期に南の空にいる黄道十二星座はしし座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座の順に並んでいます", Nil),
+    ("13h00m", "この時期に南の空にいる黄道十二星座はおとめ座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座、てんびん座、さそり座の順に並んでいます", Nil),
+    ("15h10m", "この時期に南の空にいる黄道十二星座はてんびん座です。西から東に順番に、しし座、おとめ座、てんびん座、さそり座、いて座の順に並んでいます", Nil),
+    ("16h50m", "この時期に南の空にいる黄道十二星座はさそり座です。西から東に順番に、おとめ座、てんびん座、さそり座、いて座、やぎ座の順に並んでいます", Nil),
+    ("18h40m", "この時期に南の空にいる黄道十二星座はいて座です。西から東に順番に、てんびん座、さそり座、いて座、やぎ座、みずがめ座の順に並んでいます", Nil),
+    ("21h00m", "この時期に南の空にいる黄道十二星座はやぎ座です。西から東に順番に、いて座、やぎ座、みずがめ座、うお座の順に並んでいます", Nil),
+    ("22h20m", "この時期に南の空にいる黄道十二星座はみずがめ座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座の順に並んでいます", Nil),
+
+    ("00h57m", "カシオペア座の中央の星が南中。北極星の上方向にいます", Nil),
+    ("05h04m", "北斗七星の端(スプーンのすくう側)の星が北極星のちょうど右方向にいます。カシオペア座は北極星の左上方向にいます", Nil),
+    ("06h57m", "カシオペア座が北極星のちょうど左方向にいます。北斗七星は北極星の右方向にいます", Nil),
+    ("11h04m", "北斗七星の端(スプーンのすくう側)の星が南中。北極星の上方向にいます", Nil),
+    ("13h48m", "北斗七星の柄の部分の端の星が南中。北極星の上方向にいます", Nil),
+    ("14h51m", "こぐま座βが南中。北極星から上にこぐま座が伸びています", Nil),
+    ("17h04m", "北斗七星の端(スプーンのすくう側)の星が北極星のちょうど左方向にいます。カシオペア座は北極星の右下方向にいます", Nil),
+    ("17h57m", "りゅう座γが南中。りゅう座の頭にある星です。りゅう座のしっぽは北斗七星の近くです", Nil),
+    ("18h57m", "カシオペア座が北極星のちょうど右方向にいます。北斗七星は北極星の左方向にいます", Nil),
+  ).map { t =>
+    ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2,
+    t._2, t._3);
+  }.sortBy(_._1);
+  var index: Int = -1;
+  (36 until period).foreach { day =>
+    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+    val time = startTime + day + 21.0 / 24.0;
+    val sid = hcs.siderealTime(time);
+    if (index < 0) {
+      index = stars.indexWhere(_._1 > sid);
+      if (index < 0) {
+        index = 0;
+      }
+    } else {
+      val time0 = if (sid > stars(index)._1 && (index > 0 || sid < PI)) {
+        time;
+      } else if (getTweets(time).isEmpty2) {
+        if (sid + PI2 / 12 > stars(index)._1 && (index > 0 || sid < PI)) {
+          time + (stars(index)._1 - sid) / PI2;
+        } else {
+          0.0;
+        }
+      } else {
+        0.0;
+      }
+      if (time0 > 0.0) {
+        putTweet(StarTweetContent(time0, stars(index)._2, stars(index)._3));
+        index += 1;
+        if (index == stars.size) {
+          index = 0;
+        }
+      }
+    }
+  }
+}
 
 //==============================================================================
 // なにもツイートのない日付
