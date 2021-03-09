@@ -1610,6 +1610,7 @@ sealed trait OnSunsetTweetContent extends TweetContent {
   def day: Int;
   def message: String;
   def message2: String;
+  def message3: String;
   def hashtags: List[String];
   def starNames: List[String];
 
@@ -1618,7 +1619,7 @@ sealed trait OnSunsetTweetContent extends TweetContent {
 
 case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent]) extends TweetContent {
   def time: Double = sunsetTimes(day);
-  def message: String = tc.map(_.message2).mkString("。");
+  def message: String = tc.head.message2 + "。" + tc.tail.map(_.message3).mkString("。");
   def hashtags: List[String] = tc.flatMap(_.hashtags);
   def starNames: List[String] = tc.flatMap(_.starNames);
 }
@@ -1628,6 +1629,7 @@ case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends On
   def alt360: Int = (alt * PI57 + 0.5).toInt;
   def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
   def message2: String = "新月後の細い月は日没時に西の空高度約%d°にいます".format(alt360);
+  def message3: String = "新月後の細い月は約%d°にいます".format(alt360);
   def hashtags: List[String] = Nil;
   def starNames: List[String] = List("月");
 }
@@ -1648,6 +1650,13 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   } else {
     "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
   }
+  def message3: String = if (isMax) {
+    "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
+  } else if (isIncreasing) {
+    "%sは日没時の高度を徐々に上げ、約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは日没時の高度を徐々に下げ、約%d°にいます".format(planetName, alt360);
+  }
   def hashtags: List[String] = List(planetName);
   def starNames: List[String] = List(planetName);
 }
@@ -1656,6 +1665,7 @@ case class SunsetStarTweetContent(day: Int, starName: String,
   def alt360: Int = (alt * PI57 + 0.5).toInt;
   def message: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
   def message2: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
+  def message3: String = "%sは約%d°にいます".format(starName, alt360);
   def hashtags: List[String] = List(starName);
   def starNames: List[String] = List(starName);
 }
@@ -1679,6 +1689,7 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
       "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
     }
   }
+  def message3: String = message2;
   def hashtags: List[String] = Nil;
   def starNames: List[String] = Nil;
 }
