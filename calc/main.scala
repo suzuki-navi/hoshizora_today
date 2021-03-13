@@ -1443,19 +1443,22 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
   hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
 }
 
+def calcMoonLng(time: Double): Double = {
+  val utc = time;
+  val tdb = TimeLib.mjdutcToTdb(utc);
+  val sun = jplData.calcSunFromEarth(tdb);
+  val moon = jplData.calcMoonFromEarth(tdb);
+  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+  val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
+  val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
+  val sunLng = VectorLib.xyzToLng(sun2);
+  val moonLng = VectorLib.xyzToLng(moon2);
+  VectorLib.calcLngDiff(moonLng, sunLng);
+}
+def calcMoonPhase(time: Double): Double = {
+  calcMoonLng(time) / PI2 * 28.0;
+}
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
-  def calcMoonLng(time: Double): Double = {
-    val utc = time;
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
-    val moon = jplData.calcMoonFromEarth(tdb);
-    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
-    val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-    val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
-    val sunLng = VectorLib.xyzToLng(sun2);
-    val moonLng = VectorLib.xyzToLng(moon2);
-    VectorLib.calcLngDiff(moonLng, sunLng);
-  }
   MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
 }
 
@@ -1637,9 +1640,10 @@ case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent]) ext
 case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent {
   def azi360: Int = (azi * PI57 + 0.5).toInt;
   def alt360: Int = (alt * PI57 + 0.5).toInt;
-  def message: String = "新月後の細い月は日没時に西の空高度約%d°".format(alt360);
-  def message2: String = "新月後の細い月は日没時に西の空高度約%d°にいます".format(alt360);
-  def message3: String = "新月後の細い月は約%d°にいます".format(alt360);
+  def moonPhase: Double = calcMoonPhase(sunsetTimes(day));
+  def message: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°".format(moonPhase, alt360);
+  def message2: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°にいます".format(moonPhase, alt360);
+  def message3: String = "新月後の細い月は、月相 %.1f/28 で、約%d°にいます".format(moonPhase, alt360);
   def hashtags: List[String] = Nil;
   def starNames: List[String] = List("月");
 }
@@ -1823,13 +1827,13 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
 {
   val termStrs = IndexedSeq(
     "新月",
-    "月相 1/8。新月と上弦の中間です\uD83C\uDF12",
-    "上弦の月\uD83C\uDF13",
-    "月相 3/8。上弦と満月の中間です\uD83C\uDF14",
-    "満月\uD83C\uDF15",
-    "月相 5/8。満月と下弦の中間です\uD83C\uDF16",
-    "下弦の月\uD83C\uDF17",
-    "月相 7/8。下弦と新月の中間です\uD83C\uDF18",
+    "月相 3.5/28。新月と上弦の中間です\uD83C\uDF12",
+    "上弦の月\uD83C\uDF13。月相 7/28",
+    "月相 10.5/28。上弦と満月の中間です\uD83C\uDF14",
+    "満月\uD83C\uDF15。月相 14/28",
+    "月相 17.5/28。満月と下弦の中間です\uD83C\uDF16",
+    "下弦の月\uD83C\uDF17。月相 21/28",
+    "月相 24.5/28。下弦と新月の中間です\uD83C\uDF18",
   );
   case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, cons: Option[(String, String, List[String])]) extends TweetContent {
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
@@ -2182,8 +2186,31 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 // 21時・23時の惑星
 //==============================================================================
 
-val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, Array[Double])]) = {
+{
   var moonCons: List[(Double, Array[Double])] = Nil;
+  val altThres = 10 / PI57;
+  (0 until period).foreach { d =>
+    val time = startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
+    val wday = TimeLib.wday(time);
+    val ut1 = time; // 近似的
+    val tdb = TimeLib.mjdutcToTdb(time);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    if (!getTweets(time).nightTweets.flatMap(_.starNames).contains("月")) {
+      val xyz = jplData.calcMoonFromEarth(tdb);
+      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+      if (alt >= altThres) {
+        val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+        val moonPhase = calcMoonPhase(time);
+        putTweet(time, "%s月は%sにいます。月相 %.1f/28".format(conscomment, cons, moonPhase) +
+          hashtags.map(" #" + _).mkString);
+      }
+    }
+  }
+  moonCons;
+}
+
+val planetCons: List[(Double, String, Array[Double])] = {
   var planetCons: List[(Double, String, Array[Double])] = Nil;
   val altThres = 10 / PI57;
   (0 until period).foreach { d =>
@@ -2192,14 +2219,6 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
     val ut1 = time; // 近似的
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    if (!getTweets(time).nightTweets.flatMap(_.starNames).contains("月")) {
-      val moon = jplData.calcMoonFromEarth(tdb);
-      val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(moon2, ut1);
-      if (alt >= altThres) {
-        moonCons = (time, moon) :: moonCons;
-      }
-    }
     val (planetName, targetPlanet) = if (wday == 2) {
       ("火星", Some(JplData.Mars));
     } else if (wday == 4) {
@@ -2231,14 +2250,9 @@ val (moonCons: List[(Double, Array[Double])], planetCons: List[(Double, String, 
         }
     }
   }
-  (moonCons, planetCons);
+  planetCons;
 }
 
-moonCons.foreach { case (time, xyz) =>
-  val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 6), "%s月は%sにいます".format(conscomment, cons) +
-    hashtags.map(" #" + _).mkString);
-}
 planetCons.foreach { case (time, planetName, xyz) =>
   val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
   putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName) +
