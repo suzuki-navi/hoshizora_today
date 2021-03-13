@@ -1498,13 +1498,23 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
     val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
     val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut121);
     if (alt >= altThres0) {
+      // 21時に見える
       Some(time21);
     } else {
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut121 + 2.0 / 24);
       if (alt >= altThres0) {
+        // 23時に見える
         Some(time21 + 2.0 / 24);
       } else {
-        None; // TODO
+        val day = (time - startTime).toInt;
+        val sunsetTime = sunsetTimes(day);
+        val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, sunsetTime);
+        if (alt >= altThres0) {
+          // 日没時に見える
+          Some(sunsetTime);
+        } else {
+          None;
+        }
       }
     }
   }
@@ -2019,17 +2029,17 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
 case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowStarName: String, fastStarName: String,
   distance: Double, hashtags: List[String]) extends TweetContent {
   def time: Double = TimeLib.round(rawTime, stepCountPerDay);
-  def message: String = "%sが%sに接近%s".format(fastStarName, slowStarName, distanceStr);
+  def message: String = "%sが%s%s".format(fastStarName, slowStarName, distanceStr);
   def distanceStr: String = {
     val distance360 = distance * PI57;
     if (distance360 < 1.0) {
-      " (1°未満)";
+      "に接近 (1°未満)";
     } else if (distance360 < 2.0) {
-      " (2°未満)";
+      "に接近 (2°未満)";
     } else if (distance360 < 3.0) {
-      " (3°未満)";
+      "に接近 (3°未満)";
     } else {
-      "";
+      "の近くにいます";
     }
   }
   def starNames: List[String] = List(slowStarName, fastStarName);
@@ -2147,6 +2157,19 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       calcClosest2(star0._1, star1._1, star1._1 :: star0._3,
         { tdb: Double =>
           star0._2;
+        },
+        { tdb: Double =>
+          jplData.calcPlanetFromEarth(tdb, star1._2);
+        });
+    }
+  }
+  (0 until stars1.size).foreach { i =>
+    ((i + 1) until stars1.size).foreach { j =>
+      val star1 = stars1(i);
+      val star0 = stars1(j);
+      calcClosest2(star0._1, star1._1, List(star1._1, star0._1),
+        { tdb: Double =>
+          jplData.calcPlanetFromEarth(tdb, star0._2);
         },
         { tdb: Double =>
           jplData.calcPlanetFromEarth(tdb, star1._2);
