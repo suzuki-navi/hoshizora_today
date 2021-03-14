@@ -1454,6 +1454,17 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
   hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
 }
 
+def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Array[Double], Double, Double) = {
+  val utc = time;
+  val tdb = TimeLib.mjdutcToTdb(utc);
+  val ut1 = time; // 近似的
+  val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+  val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+  val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+  val azialt = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+  (xyz, azialt._1, azialt._2);
+}
+
 def calcMoonLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
@@ -2203,12 +2214,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
     if (!getTweets(time).nightTweets.flatMap(_.starNames).contains("月")) {
-      val ut1 = time; // 近似的
-      val tdb = TimeLib.mjdutcToTdb(time);
-      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-      val xyz = jplData.calcMoonFromEarth(tdb);
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+      val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
       if (alt >= altThres) {
         val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
         val moonPhase = calcMoonPhase(time);
@@ -2216,12 +2222,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           hashtags.map(" #" + _).mkString);
       } else {
         val time = startTime + d + 23.0 / 24.0;
-        val ut1 = time; // 近似的
-        val tdb = TimeLib.mjdutcToTdb(time);
-        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-        val xyz = jplData.calcMoonFromEarth(tdb);
-        val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
-        val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+        val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
         if (alt >= altThres) {
           val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
           val moonPhase = calcMoonPhase(time);
@@ -2315,6 +2316,7 @@ manualTweet.split("\n").foreach { line =>
 //==============================================================================
 
 def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay: Int): Unit = {
+  val altHor = -0.90 / PI57;
   val hashtag = " #星空";
   var nextDay: Int = startDay;
   (0 until period).foreach { day =>
@@ -2324,7 +2326,12 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay:
       val sid = hcs.siderealTime(time);
       val cons = Constellations.siderealTimeToConstellation(sid, data);
       if (cons != "") {
-        putTweet(time, cons + hashtag);
+        val msg = if (calcPlanetXyzAziAlt(time, JplData.Moon)._3 >= altHor) {
+          cons;
+        } else {
+          cons + "。月明かりなし";
+        }
+        putTweet(time, msg + hashtag);
       }
       nextDay = day + span;
     }
@@ -2418,7 +2425,7 @@ tweetConstellations(Constellations.season, 7, 36); // PERIOD
     // ペガスス
     ("23h04m", "ペガスス座の四角形の西(右)の辺が南中", Nil),
     // TODO とかげ
-    ("00h08m", "ペガスス座の四角形の東(左)の辺が南中。ペガスス座の四角形の左上の星はアンドロメダ座α(2等星)です。", Nil),
+    ("00h08m", "ペガスス座の四角形の東(左)の辺が南中。ペガスス座の四角形の左上の星はアンドロメダ座α(2等星)です", Nil),
     ("01h10m", "アンドロメダ座β(2等星)が南中。アンドロメダ座は西(右)から東(左)にα、β、γと2等星が並んでいます。βの近くにアンドロメダ銀河がいます。アンドロメダ銀河は40億年後に天の川銀河と衝突します", Nil),
     ("02h04m", "アンドロメダ座γ(2等星)が南中。アンドロメダ座は西(右)から東(左)にα、β、γと2等星が並んでいます", Nil),
 
@@ -2448,6 +2455,9 @@ tweetConstellations(Constellations.season, 7, 36); // PERIOD
     ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2,
     t._2, t._3);
   }.sortBy(_._1);
+
+  val altHor = -0.90 / PI57;
+
   var index: Int = -1;
   (52 until period).foreach { day => // PERIOD
     val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
@@ -2474,7 +2484,12 @@ tweetConstellations(Constellations.season, 7, 36); // PERIOD
         0.0;
       }
       if (time0 > 0.0) {
-        putTweet(StarTweetContent(time0, stars(index)._2, stars(index)._3));
+        val msg = if (calcPlanetXyzAziAlt(time0, JplData.Moon)._3 >= altHor) {
+          stars(index)._2;
+        } else {
+          stars(index)._2 + "。月明かりなし";
+        }
+        putTweet(StarTweetContent(time0, msg, stars(index)._3));
         index += 1;
         if (index == stars.size) {
           index = 0;
