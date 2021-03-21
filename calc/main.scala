@@ -1719,7 +1719,19 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
     } else if (flag == 3) {
       "日没はこのころが最も早く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
     } else {
-      "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+      if (day >= 7) {
+        val timePrev = sunsetTimes(day - 7);
+        val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
+        if (d > 0) {
+          "日没は%sごろです。先週から約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
+        } else if (d < 0) {
+          "日没は%sごろです。先週から約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
+        } else {
+          "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+        }
+      } else {
+        "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+      }
     }
   }
   def message2: String = {
@@ -1728,7 +1740,19 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
     } else if (flag == 3) {
       "日没はこのころが最も早く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
     } else {
-      "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+      if (day >= 7) {
+        val timePrev = sunsetTimes(day - 7);
+        val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
+        if (d > 0) {
+          "日没は%sごろで、先週から約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
+        } else if (d < 0) {
+          "日没は%sごろで、先週から約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
+        } else {
+          "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+        }
+      } else {
+        "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+      }
     }
   }
   def message3: String = message2;
