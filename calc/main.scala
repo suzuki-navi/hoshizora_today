@@ -1989,6 +1989,11 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
 // 惑星の天象
 //==============================================================================
 
+case class PlanetAstronomyTweetContent(time: Double, message: String, planetName: String) extends TweetContent {
+  def hashtags: List[String] = List(planetName);
+  def starNames: List[String] = List(planetName);
+}
+
 {
   def calcInnerPlanetLngEc(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
@@ -2003,6 +2008,51 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
     val d1 = VectorLib.calcLngDiff(planetLng, sunLng);
     if (d1 >= PI) d1 - PI2 else d1;
   }
+
+  {
+    val (planetName, targetPlanet) = ("水星", JplData.Mercury);
+    MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
+      calcInnerPlanetLngEc(time, targetPlanet);
+    }.map { case (time, term) =>
+      if (term == 0) {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+          "水星が外合(黄経基準)", planetName));
+      } else if (term == 1) {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+          "水星が東方最大離角(黄経基準)\uD83C\uDF13", planetName));
+      } else if (term == 2) {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+          "水星が内合(黄経基準)", planetName));
+      } else {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+          "水星が西方最大離角(黄経基準)\uD83C\uDF17", planetName));
+      }
+    }
+  }
+
+  {
+    val (planetName, targetPlanet) = ("金星", JplData.Venus);
+    MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
+      calcInnerPlanetLngEc(time, targetPlanet);
+    }.map { case (time, term) =>
+      if (term == 0) {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+          "金星が外合(黄経基準)。数か月後に夕方の西の空に現れます", planetName));
+      } else if (term == 1) {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+          "金星が東方最大離角(黄経基準)\uD83C\uDF13。宵の明星として夕方に西の空にいます", planetName));
+      } else if (term == 2) {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+          "金星が内合(黄経基準)。数週間後に明け方の東の空に現れます", planetName));
+      } else {
+        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+          "金星が西方最大離角(黄経基準)\uD83C\uDF17。明けの明星として明け方に東の空にいます", planetName));
+      }
+    }
+  }
+}
+
+{
   def calcOuterPlanetLngEq(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
@@ -2041,27 +2091,7 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
     }
   }
 
-  val planetPhases2: List[(Double, String, String, Boolean, Option[Array[Double]])] = List(
-    ("水星", JplData.Mercury),
-    ("金星", JplData.Venus),
-  ).flatMap { t =>
-    val (planetName, targetPlanet) = t;
-    MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
-      calcInnerPlanetLngEc(time, targetPlanet);
-    }.map { case (time, term) =>
-      if (term == 0) {
-        (time, planetName, "外合(黄経基準)", false, None);
-      } else if (term == 1) {
-        (time, planetName, "東方最大離角(黄経基準)\uD83C\uDF13", true, None);
-      } else if (term == 2) {
-        (time, planetName, "内合(黄経基準)", false, None);
-      } else {
-        (time, planetName, "西方最大離角(黄経基準)\uD83C\uDF17", true, None);
-      }
-    }
-  }
-
-  (planetPhases1 ++ planetPhases2).foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
+  planetPhases1.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
     val time2 = if (timeFlag) {
       TimeLib.round(time, 24) - 1.0 / (24 * 4);
     } else {
