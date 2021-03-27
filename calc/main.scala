@@ -8,6 +8,7 @@ val period = (endTime - startTime).toInt;
 val jplDataPath = "../var/ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.430";
 val nutLsDataPath = "nut-ls.txt";
 val nutPlDataPath = "nut-pl.txt";
+val constellationsDataPath = "constellations.txt";
 
 val PI = Math.PI;
 val PI2 = Math.PI * 2.0;
@@ -1620,8 +1621,42 @@ def putTweet(time: Double, msg: String): Unit = {
 }
 
 //==============================================================================
-// 24節気
+// 12時にツイートする日付単位で発生する天文の現象
 //==============================================================================
+
+// PERIOD
+
+val manualTweet = """
+2021-11-05T12:00 天王星が衝
+2021-09-15T12:00 海王星が衝
+2021-07-18T12:00 冥王星が衝
+
+2021-11-28T12:00 準惑星ケレスが衝
+2021-09-09T12:00 小惑星パラスが衝
+2021-06-08T12:00 小惑星ジュノーが衝
+2021-03-08T12:00 小惑星ベスタが衝
+
+2021-04-28T12:00 準惑星ハウメアが衝
+2021-04-09T12:00 準惑星マケマケが衝
+2021-10-22T12:00 準惑星エリスが衝
+""";
+
+manualTweet.split("\n").foreach { line =>
+  val cols = line.split(" ", 2);
+  if (cols.length == 2) {
+    val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
+    val msg = cols(1);
+     putTweet(time, msg);
+  }
+}
+
+//==============================================================================
+// 特定の時間に発生する天文の現象
+//==============================================================================
+
+//--------------------------------------
+// 24節気
+//--------------------------------------
 
 {
   val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, startTime, endTime, 3.0, 24) { time =>
@@ -1646,238 +1681,9 @@ def putTweet(time: Double, msg: String): Unit = {
   }
 }
 
-//==============================================================================
-// 日没時の西の空
-//==============================================================================
-
-sealed trait OnSunsetTweetContent extends TweetContent {
-  def day: Int;
-  def message: String;
-  def message2: String;
-  def message3: String;
-  def hashtags: List[String];
-  def starNames: List[String];
-
-  def time: Double = sunsetTimes(day);
-}
-
-case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent]) extends TweetContent {
-  def time: Double = sunsetTimes(day);
-  def message: String = tc.head.message2 + "。" + tc.tail.map(_.message3).mkString("。");
-  def hashtags: List[String] = tc.flatMap(_.hashtags);
-  def starNames: List[String] = tc.flatMap(_.starNames);
-}
-
-case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent {
-  def azi360: Int = (azi * PI57 + 0.5).toInt;
-  def alt360: Int = (alt * PI57 + 0.5).toInt;
-  def moonPhase: Double = calcMoonPhase(sunsetTimes(day));
-  def message: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°".format(moonPhase, alt360);
-  def message2: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°にいます".format(moonPhase, alt360);
-  def message3: String = "新月後の細い月は、月相 %.1f/28 で、約%d°にいます".format(moonPhase, alt360);
-  def hashtags: List[String] = Nil;
-  def starNames: List[String] = List("月");
-}
-case class SunsetPlanetTweetContent(day: Int, planetName: String,
-  azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
-  def alt360: Int = (alt * PI57 + 0.5).toInt;
-  def message: String = if (isMax) {
-    "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
-  } else if (isIncreasing) {
-    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-  } else {
-    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
-  }
-  def message2: String = if (isMax) {
-    "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
-  } else if (isIncreasing) {
-    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-  } else {
-    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
-  }
-  def message3: String = if (isMax) {
-    "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
-  } else if (isIncreasing) {
-    "%sは日没時の高度を徐々に上げ、約%d°にいます".format(planetName, alt360);
-  } else {
-    "%sは日没時の高度を徐々に下げ、約%d°にいます".format(planetName, alt360);
-  }
-  def hashtags: List[String] = List(planetName);
-  def starNames: List[String] = List(planetName);
-}
-case class SunsetStarTweetContent(day: Int, starName: String,
-  azi: Double, alt: Double) extends OnSunsetTweetContent {
-  def alt360: Int = (alt * PI57 + 0.5).toInt;
-  def message: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
-  def message2: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
-  def message3: String = "%sは約%d°にいます".format(starName, alt360);
-  def hashtags: List[String] = List(starName);
-  def starNames: List[String] = List(starName);
-}
-
-case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent {
-  def message: String = {
-    if (flag == 1) {
-      "日没はこのころが最も遅く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    } else if (flag == 3) {
-      "日没はこのころが最も早く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    } else {
-      if (day >= 7) {
-        val timePrev = sunsetTimes(day - 7);
-        val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
-        if (d > 0) {
-          "日没は%sごろです。この1週間で約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
-        } else if (d < 0) {
-          "日没は%sごろです。この1週間で約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
-        } else {
-          "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-        }
-      } else {
-        "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-      }
-    }
-  }
-  def message2: String = {
-    if (flag == 1) {
-      "日没はこのころが最も遅く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    } else if (flag == 3) {
-      "日没はこのころが最も早く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-    } else {
-      if (day >= 7) {
-        val timePrev = sunsetTimes(day - 7);
-        val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
-        if (d > 0) {
-          "日没は%sごろで、この1週間で約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
-        } else if (d < 0) {
-          "日没は%sごろで、この1週間で約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
-        } else {
-          "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-        }
-      } else {
-        "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
-      }
-    }
-  }
-  def message3: String = message2;
-  def hashtags: List[String] = Nil;
-  def starNames: List[String] = Nil;
-}
-
-// 日没時最大高度
-{
-  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
-  planets.foreach { p =>
-    MathLib.findMaxMinListDiscrete(0, period, 15) { day =>
-      val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-      alt;
-    }.foreach { case (day, flag) =>
-      if (flag > 0) {
-        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-        putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, true, true));
-      }
-    }
-  }
-}
-
-// 新月直後の月
-{
-  val aziThres0 = 200 / PI57;
-  val aziThres1 = 315 / PI57;
-  val altThres0 = 10 / PI57;
-
-  (0 until moonPhaseTerms.size).foreach { i =>
-    val (moonPhaseTime, term) = moonPhaseTerms(i);
-    if (term == 0 && moonPhaseTime + 4 < endTime) {
-      val d = (0 until 4).indexWhere { d =>
-        val day = (moonPhaseTime + d - startTime).toInt;
-        val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
-        alt >= altThres0;
-      }
-      val day = (moonPhaseTime + d - startTime).toInt;
-      val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
-      putTweet(SunsetMoonTweetContent(day, azi, alt));
-    }
-  }
-}
-
-// 水曜・金曜
-{
-  val aziThres0 = 200 / PI57;
-  val aziThres1 = 315 / PI57;
-  val altThres0 = 10 / PI57;
-
-  val planets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
-  (1 until period).foreach { day =>
-    val wday = TimeLib.wday(startTime + day);
-    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
-    planets.foreach { p =>
-      if (wday == p._3 && !sunsetTweets.exists(_.starNames.contains(p._1))) {
-        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-        if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-          val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
-          val isIncreasing = (alt >= prevAlt);
-          putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
-        }
-      }
-    }
-  }
-}
-
-// 日没ツイートがある場合に他の天体のツイートも追加
-{
-  val aziThres0 = 200 / PI57;
-  val aziThres1 = 315 / PI57;
-  val altThres0 = 10 / PI57;
-
-  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
-  val planets2 = IndexedSeq(("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn));
-  (1 until period).foreach { day =>
-    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
-    if (sunsetTweets.nonEmpty) {
-      planets.foreach { p =>
-        if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
-          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-            val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
-            val isIncreasing = (alt >= prevAlt);
-            putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
-          }
-        }
-      };
-      {
-        val p = ("月", JplData.Moon);
-        if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
-          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-            putTweet(SunsetMoonTweetContent(day, azi, alt));
-          }
-        }
-      }
-      planets2.foreach { p =>
-          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-            putTweet(SunsetStarTweetContent(day, p._1, azi, alt));
-          }
-      };
-    }
-  }
-}
-
-// 日没時間
-{
-  MathLib.getMaxMinUpDownFlagListDiscrete(0, period, 90) { day =>
-    sunsetTimes(day) - startTime - day;
-  }.zipWithIndex.foreach { case (flag, day) =>
-    val wday = TimeLib.wday(startTime + day);
-    if (flag == 1 || flag == 3 || wday == 0) {
-      putTweet(SunsetTweetContent(day, flag));
-    }
-  }
-}
-
-//==============================================================================
+//--------------------------------------
 // 月相
-//==============================================================================
+//--------------------------------------
 
 {
   case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, distanceFlag: Int,
@@ -1960,9 +1766,9 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
   }.foreach(putTweet);
 }
 
-//==============================================================================
+//--------------------------------------
 // 近日点・遠日点
-//==============================================================================
+//--------------------------------------
 
 MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   val utc = time;
@@ -1974,9 +1780,9 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
 }
 
-//==============================================================================
+//--------------------------------------
 // 惑星の天象
-//==============================================================================
+//--------------------------------------
 
 case class PlanetAstronomyTweetContent(time: Double, message: String, planetName: String) extends TweetContent {
   def hashtags: List[String] = List(planetName);
@@ -2093,6 +1899,224 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
       val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
       putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName) +
         hashtags.map(" #" + _).mkString);
+    }
+  }
+}
+
+//==============================================================================
+// 日没時の西の空
+//==============================================================================
+
+sealed trait OnSunsetTweetContent extends TweetContent {
+  def day: Int;
+  def message: String;
+  def message2: String;
+  def message3: String;
+  def hashtags: List[String];
+  def starNames: List[String];
+
+  def time: Double = sunsetTimes(day);
+}
+
+case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent]) extends TweetContent {
+  def time: Double = sunsetTimes(day);
+  def message: String = tc.head.message2 + "。" + tc.tail.map(_.message3).mkString("。");
+  def hashtags: List[String] = tc.flatMap(_.hashtags);
+  def starNames: List[String] = tc.flatMap(_.starNames);
+}
+
+case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent {
+  def azi360: Int = (azi * PI57 + 0.5).toInt;
+  def alt360: Int = (alt * PI57 + 0.5).toInt;
+  def moonPhase: Double = calcMoonPhase(sunsetTimes(day));
+  def message: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°".format(moonPhase, alt360);
+  def message2: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°にいます".format(moonPhase, alt360);
+  def message3: String = "新月後の細い月は、月相 %.1f/28 で、約%d°にいます".format(moonPhase, alt360);
+  def hashtags: List[String] = Nil;
+  def starNames: List[String] = List("月");
+}
+case class SunsetPlanetTweetContent(day: Int, planetName: String,
+  azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
+  def alt360: Int = (alt * PI57 + 0.5).toInt;
+  def message: String = if (isMax) {
+    "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
+  } else if (isIncreasing) {
+    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  }
+  def message2: String = if (isMax) {
+    "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
+  } else if (isIncreasing) {
+    "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  }
+  def message3: String = if (isMax) {
+    "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
+  } else if (isIncreasing) {
+    "%sは日没時の高度を徐々に上げ、約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは日没時の高度を徐々に下げ、約%d°にいます".format(planetName, alt360);
+  }
+  def hashtags: List[String] = List(planetName);
+  def starNames: List[String] = List(planetName);
+}
+case class SunsetStarTweetContent(day: Int, starName: String,
+  azi: Double, alt: Double) extends OnSunsetTweetContent {
+  def alt360: Int = (alt * PI57 + 0.5).toInt;
+  def message: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
+  def message2: String = "%sは西の空高度約%d°にいます".format(starName, alt360);
+  def message3: String = "%sは約%d°にいます".format(starName, alt360);
+  def hashtags: List[String] = List(starName);
+  def starNames: List[String] = List(starName);
+}
+
+case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent {
+  def message(level: Int): String = {
+    if (flag == 1) {
+      "日没はこのころが最も遅く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+    } else if (flag == 3) {
+      "日没はこのころが最も早く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+    } else {
+      if (day >= 7) {
+        val timePrev = sunsetTimes(day - 7);
+        val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
+        if (d > 0) {
+          "日没は%sごろで、この1週間で約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
+        } else if (d < 0) {
+          "日没は%sごろで、この1週間で約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
+        } else {
+          if (level == 2) {
+            "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+          } else {
+            "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+          }
+        }
+      } else {
+        if (level == 2) {
+          "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+        } else {
+          "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+        }
+      }
+    }
+  }
+  def message: String = message(1);
+  def message2: String = message(2);
+  def message3: String = message2;
+  def hashtags: List[String] = Nil;
+  def starNames: List[String] = Nil;
+}
+
+// 日没時最大高度
+{
+  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
+  planets.foreach { p =>
+    MathLib.findMaxMinListDiscrete(0, period, 15) { day =>
+      val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+      alt;
+    }.foreach { case (day, flag) =>
+      if (flag > 0) {
+        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+        putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, true, true));
+      }
+    }
+  }
+}
+
+// 新月直後の月
+{
+  val aziThres0 = 200 / PI57;
+  val aziThres1 = 315 / PI57;
+  val altThres0 = 10 / PI57;
+
+  (0 until moonPhaseTerms.size).foreach { i =>
+    val (moonPhaseTime, term) = moonPhaseTerms(i);
+    if (term == 0 && moonPhaseTime + 4 < endTime) {
+      val d = (0 until 4).indexWhere { d =>
+        val day = (moonPhaseTime + d - startTime).toInt;
+        val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
+        alt >= altThres0;
+      }
+      val day = (moonPhaseTime + d - startTime).toInt;
+      val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
+      putTweet(SunsetMoonTweetContent(day, azi, alt));
+    }
+  }
+}
+
+// 水曜・金曜
+{
+  val aziThres0 = 200 / PI57;
+  val aziThres1 = 315 / PI57;
+  val altThres0 = 10 / PI57;
+
+  val planets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
+  (1 until period).foreach { day =>
+    val wday = TimeLib.wday(startTime + day);
+    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+    planets.foreach { p =>
+      if (wday == p._3 && !sunsetTweets.exists(_.starNames.contains(p._1))) {
+        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+        if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+          val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
+          val isIncreasing = (alt >= prevAlt);
+          putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
+        }
+      }
+    }
+  }
+}
+
+// 日没ツイートがある場合に他の天体のツイートも追加
+{
+  val aziThres0 = 200 / PI57;
+  val aziThres1 = 315 / PI57;
+  val altThres0 = 10 / PI57;
+
+  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
+  val planets2 = IndexedSeq(("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn));
+  (1 until period).foreach { day =>
+    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+    if (sunsetTweets.nonEmpty) {
+      planets.foreach { p =>
+        if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
+          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+            val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
+            val isIncreasing = (alt >= prevAlt);
+            putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
+          }
+        }
+      };
+      {
+        val p = ("月", JplData.Moon);
+        if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
+          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+            putTweet(SunsetMoonTweetContent(day, azi, alt));
+          }
+        }
+      }
+      planets2.foreach { p =>
+          val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+          if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+            putTweet(SunsetStarTweetContent(day, p._1, azi, alt));
+          }
+      };
+    }
+  }
+}
+
+// 日没時間
+{
+  MathLib.getMaxMinUpDownFlagListDiscrete(0, period, 90) { day =>
+    sunsetTimes(day) - startTime - day;
+  }.zipWithIndex.foreach { case (flag, day) =>
+    val wday = TimeLib.wday(startTime + day);
+    if (flag == 1 || flag == 3 || wday == 0) {
+      putTweet(SunsetTweetContent(day, flag));
     }
   }
 }
@@ -2334,33 +2358,6 @@ planetCons.foreach { case (time, planetName, xyz) =>
 }
 
 //==============================================================================
-
-val manualTweet = """
-2021-11-05T12:00 天王星が衝
-2021-09-15T12:00 海王星が衝
-2021-07-18T12:00 冥王星が衝
-
-2021-11-28T12:00 準惑星ケレスが衝
-2021-09-09T12:00 小惑星パラスが衝
-2021-06-08T12:00 小惑星ジュノーが衝
-2021-03-08T12:00 小惑星ベスタが衝
-
-2021-04-28T12:00 準惑星ハウメアが衝
-2021-04-09T12:00 準惑星マケマケが衝
-2021-10-22T12:00 準惑星エリスが衝
-""";
-
-manualTweet.split("\n").foreach { line =>
-  val cols = line.split(" ", 2);
-  if (cols.length == 2) {
-    val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
-    val msg = cols(1);
-     putTweet(time, msg);
-  }
-}
-
-
-//==============================================================================
 // 星座
 //==============================================================================
 
@@ -2386,9 +2383,7 @@ def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay:
     }
   }
 }
-//tweetConstellations(Constellations.ecliptical, 14, 59);
 tweetConstellations(Constellations.season, 7, 36); // PERIOD
-//tweetConstellations(Constellations.northern, 14, 39);
 
 {
   import Ordering.Double.IeeeOrdering;
@@ -2396,111 +2391,26 @@ tweetConstellations(Constellations.season, 7, 36); // PERIOD
     def hashtags: List[String] = "星空" :: hashtags2;
     def starNames: List[String] = Nil;
   }
-  val stars = IndexedSeq(
-    // J2000
-
-    // 冬の星座
-    ("03h08m", "ペルセウス座アルゴル(2等星)が南中。天頂付近です", Nil),
-    ("03h24m", "ペルセウス座α(2等星)が南中。北の空高くにいます", Nil),
-    ("03h47m", "おうし座すばるが南中。天頂付近です", List("プレアデス星団")),
-    ("04h30m", "この時期に南の空高くにいる黄道十二星座はおうし座です。西から東に順番に、うお座、おひつじ座、おうし座、ふたご座、かに座、の順に並んでいます", Nil),
-    ("04h36m", "おうし座アルデバランが南中。南の空高くにいます。冬のダイヤモンドを構成する6個の星の1つです", Nil),
-    ("05h26m", "おうし座βが南中。天頂付近です。おうし座の角であり、ぎょしゃ座の五角形の1つでもあります", Nil),
-    ("04h50m", "オリオン座π3(3等星)が南中。オリオン座の西にある星です", List("オリオン座")),
-    ("05h15m", "オリオン座リゲルが南中。オリオン座の南西(右下)の星で、冬のダイヤモンドを構成する6個の星の1つです", List("オリオン座")),
-    ("05h17m", "ぎょしゃ座カペラが南中。天頂付近です。冬のダイヤモンドを構成する6個の星の1つです", Nil),
-    ("05h36m", "オリオン座εが南中。オリオン座の三つ星の中央の星です。その南(下)にはオリオン座大星雲がいます", List("オリオン座")),
-    ("05h55m", "オリオン座ベテルギウスが南中。オリオン座の北東(左上)の星で、冬のダイヤモンドの中心の星です", List("オリオン座")),
-    ("05h33m", "うさぎ座α(3等星)が南中。うさぎ座はオリオン座の南(下)にいる目立たない星座です", Nil),
-    ("06h45m", "おおいぬ座シリウスが南中。太陽を除いてもっとも明るい恒星です。冬のダイヤモンドを構成する6個の星の1つです", Nil),
-    ("06h29m", "いっかくじゅう座βが南中。いっかくじゅう座はオリオン座とこいぬ座とおおいぬ座に囲まれた領域の目立たない星座です", Nil),
-    ("07h39m", "こいぬ座プロキオンが南中。冬のダイヤモンドを構成する6個の星の1つです", Nil),
-    ("07h00m", "この時期に南の空高くにいる黄道十二星座はふたご座です。西から東に順番に、おひつじ座、おうし座、ふたご座、かに座、しし座の順に並んでいます", Nil),
-    ("06h38m", "ふたご座γが南中。南の空高くにいます。ふたご座の東側の子の足元の星です", Nil),
-    ("07h35m", "ふたご座の西側の明るい星カストルが南中。天頂付近です。東側のポルックスよりよりやや暗いです", Nil),
-    ("07h45m", "ふたご座の東側の明るい星ポルックスが南中。天頂付近です。西側のカストルよりも明るく、冬のダイヤモンドを構成する6個の星の1つです", Nil),
-
-    ("08h08m", "とも座ρ(3等星)が南中。とも座はおおいぬ座の南東(左下)にあり、日本からは南の空低くにしか見られません", Nil),
-
-    // 春の北の空の目立たない星座
-    ("08h17m", "かに座β(4等星)が南中。かに座の南西(右下)の星です", Nil),
-    ("08h40m", "この時期に南の空高くにいる黄道十二星座はかに座です。西から東に順番に、おうし座、ふたご座、かに座、しし座、おとめ座の順に並んでいます", Nil),
-    ("09h21m", "やまねこ座α(3等星)が南中。天頂付近です。やまねこ座は、ぎょしゃ座・ふたご座・かに座とおおぐま座の隙間にある目立たない星座で、見つけるにはヤマネコのような暗視能力が必要だとも", Nil),
-    ("10h53m", "こじし座で一番明るい星「46番星」(4等星)が南中。天頂付近です。こじし座は、しし座の頭とおおぐま座の隙間にある目立たない星座です。小さな獅子(しし)の意味", Nil),
-    ("12h23m", "かみのけ座の散開星団が南中。天頂付近です。りょうけん座コル・カロリ(3等星)としし座デネブの中間にあります。かみのけ座は、この散開星団を中心とした目立たない星座で、銀河北極点に位置します。かみのけ座銀河団もあります", Nil),
-    ("12h56m", "りょうけん座コル・カロリ(3等星)が南中。天頂付近です。春の大三角形であるうしかい座アークトゥルス、おとめ座スピカ、しし座デネブにコル・カロリを加えると、春のダイヤモンドです", Nil),
-
-    // うみへび座付近
-    ("08h55m", "うみへび座の頭にある星ζ(3等星)が南中。うみへび座の頭はかに座の南(下)にあります。うみへび座は、全天でもっとも大きな星座で、東西に長く、尾はてんびん座付近です", Nil),
-    ("09h28m", "うみへび座α(2等星)が南中。しし座レグルスの南西(右下)です。うみへび座は、全天でもっとも大きな星座で、東西に長く、頭はかに座付近、尾はてんびん座付近です", Nil),
-    ("13h19m", "うみへび座γ(3等星)が南中。おとめ座スピカの南(下)です。うみへび座は、全天でもっとも大きな星座で、東西に長く、頭はかに座付近、尾はてんびん座付近です", Nil),
-    ("10h24m", "ろくぶんぎ座が南中。ろくぶんぎ座は、しし座レグルスの南(下)、うみへび座αの東(左)にある目立たない星座です", Nil),
-    ("11h19m", "コップ座が南中。コップ座は、しし座の後ろ足の南(下)、からす座の西(右)にある目立たない星座です。コップというよりは杯です", Nil),
-    ("12h16m", "からす座が南中。からす座は、おとめ座スピカの南西(右下)にある目立たない星座です。北斗七星、うしかい座アークトゥルス、おとめ座スピカ、からす座で春の大曲線を構成します", Nil),
-
-    // 春の大三角形
-    ("10h08m", "しし座の前足にあるレグルスが南中。東(左)にはしし座の尾のデネボラがいます", Nil),
-    ("10h40m", "この時期に南の空にいる黄道十二星座はしし座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座の順に並んでいます", Nil),
-    ("11h49m", "しし座の尾にあるデネボラが南中。おとめ座スピカ、うしかい座アークトゥルスとともに春の大三角形を構成します。西(右)にはしし座の前足のレグルスがいます", Nil),
-    ("13h00m", "この時期に南の空にいる黄道十二星座はおとめ座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座、てんびん座、さそり座の順に並んでいます", Nil),
-    ("13h25m", "おとめ座スピカが南中。しし座デネボラ、うしかい座アークトゥルスとともに春の大三角形を構成します", Nil),
-    ("14h16m", "うしかい座アークトゥルスが南中。南の空高くにいます。しし座デネボラ、おとめ座スピカとともに春の大三角形を構成します。全天でシリウス、カノープスに次ぐ明るさの恒星です", Nil),
-
-    // へびつかい座付近
-    ("15h35m", "かんむり座αが南中。天頂付近です。かんむり座は、西のうしかい座と東のヘラクレス座に挟まれ、へび座の頭の北にあります。唯一の2等星αを中心に小さなはっきりとした半円形のかんむりを描いています", Nil),
-    ("17h00m", "ヘラクレス座が南中。天頂付近です。ヘラクレス座は、大きな星座ですが、明るい星はありません。ヘラクレス座の西はかんむり座、南はへびつかい座、東はこと座、北はりゅう座です", Nil),
-    ("15h44m", "へび座α(3等星)が南中。へび座でもっとも明るい星で、へびの頭にあります。夏の大三角形のベガとアルタイルを軸にして、デネブと線対称の位置です", Nil),
-    ("17h35m", "へびつかい座α(2等星)が南中。へびつかい座でもっとも明るい星です。へびつかい座は、さそり座の北(上)、ヘラクレス座の南にある星座です。へびつかいの持っているへびの頭はかんむり座付近、尾はわし座付近です", Nil),
-    ("18h21m", "へび座η(3等星)が南中。へび座の尾にある星です", Nil),
-    // TODO たて座
-
-    // 夏の大三角形
-    ("18h37m", "こと座ベガが南中。天頂付近です。夏の大三角形の1つです。ベガの東はわし座アルタイルです", Nil),
-    ("19h51m", "わし座アルタイルが南中。夏の大三角形であるベガ・アルタイル・デネブは空高くにいます", Nil),
-    ("20h41m", "はくちょう座デネブが南中。天頂付近です。夏の大三角形の1つです。デネブの西はこと座ベガです", Nil),
-    // TODO こぎつね、いるか、こうま
-
-    // さそり座付近
-    ("15h10m", "この時期に南の空にいる黄道十二星座はてんびん座です。西から東に順番に、しし座、おとめ座、てんびん座、さそり座、いて座の順に並んでいます", Nil),
-    ("16h29m", "さそり座アンタレスが南中。アンタレスは火星のように赤い星です", Nil),
-    ("16h50m", "この時期に南の空にいる黄道十二星座はさそり座です。西から東に順番に、おとめ座、てんびん座、さそり座、いて座、やぎ座の順に並んでいます", Nil),
-    ("18h40m", "この時期に南の空にいる黄道十二星座はいて座です。西から東に順番に、てんびん座、さそり座、いて座、やぎ座、みずがめ座の順に並んでいます。いて座は南斗六星が目印です。銀河系の中心方向であり、天の川がもっとも濃い領域です", Nil),
-
-    // 秋の黄道星座
-    ("20h21m", "やぎ座βが南中。やぎ座の西(右)端の星で、夏の大三角形のベガからアルタイルへの直線を延ばしたところにいます", Nil),
-    ("21h00m", "この時期に南の空にいる黄道十二星座はやぎ座です。西から東に順番に、いて座、やぎ座、みずがめ座、うお座の順に並んでいます", Nil),
-    ("21h47m", "やぎ座δが南中。やぎ座の東(左)端の星です", Nil),
-    ("22h48m", "みなみのうお座フォーマルハウトが南中", Nil),
-    ("22h20m", "この時期に南の空にいる黄道十二星座はみずがめ座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座の順に並んでいます", Nil),
-
-    // ペガスス
-    ("23h04m", "ペガスス座の四角形の西(右)の辺が南中。南の空高くにいます", Nil),
-    // TODO とかげ
-    ("00h08m", "ペガスス座の四角形の東(左)の辺が南中。南の空高くにいます。ペガスス座の四角形の左上の星はアンドロメダ座α(2等星)です", Nil),
-    ("01h10m", "アンドロメダ座β(2等星)が南中。天頂付近です。アンドロメダ座は西(右)から東(左)にα、β、γと2等星が並んでいます。βの近くにアンドロメダ銀河がいます。アンドロメダ銀河は40億年後に天の川銀河と衝突します", Nil),
-    ("02h04m", "アンドロメダ座γ(2等星)が南中。天頂付近です。アンドロメダ座は西(右)から東(左)にα、β、γと2等星が並んでいます", Nil),
-
-    // ペガススの東
-    // TODO さんかく
-    ("23h17m", "うお座γ(4等星)が南中。うお座の東側の魚の頭にいます。ペガススの四角形の南(下)です", Nil),
-    ("00h50m", "この時期に南の空にいる黄道十二星座はうお座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座、ふたご座の順に並んでいます", Nil),
-    ("01h31m", "うお座η(4等星)が南中。うお座で最も明るい星で、うお座の西側の魚の中ほどにいます", Nil),
-    ("02h07m", "おひつじ座α(2等星)が南中。南の空高くです", Nil),
-    ("02h40m", "この時期に南の空高くにいる黄道十二星座はおひつじ座です。西から東に順番に、みずがめ座、うお座、おひつじ座、おうし座、ふたご座、かに座の順に並んでいます", Nil),
-    // TODO くじら、エリダヌス
-
-    ("00h57m", "カシオペア座の中央の星が南中。北極星の上方向にいます", Nil),
-    ("05h04m", "北斗七星の端(スプーンのすくう側)の星が北極星のちょうど右方向にいます。カシオペア座は北極星の左上方向にいます", Nil),
-    ("06h57m", "カシオペア座が北極星のちょうど左方向にいます。北斗七星は北極星の右方向にいます", Nil),
-    ("11h04m", "北斗七星の端(スプーンのすくう側)の星が南中。北極星の上方向にいます", Nil),
-    ("13h48m", "北斗七星の柄の部分の端の星が南中。北の空高く、北極星の上方向にいます", Nil),
-    ("14h51m", "こぐま座βが南中。北極星から上にこぐま座が伸びています", Nil),
-    ("17h04m", "北斗七星の端(スプーンのすくう側)の星が北極星のちょうど左方向にいます。カシオペア座は北極星の右下方向にいます", Nil),
-    ("17h57m", "りゅう座γが南中。りゅう座の頭にある星です。りゅう座の尾は北斗七星の近くです", Nil),
-    ("18h57m", "カシオペア座が北極星のちょうど右方向にいます。北斗七星は北極星の左方向にいます", Nil),
-    // TODO ケフェウス、きりん
-
-  ).map { t =>
+  val stars = {
+    val source = scala.io.Source.fromFile(constellationsDataPath);
+    var stars: List[(String, String, List[String])] = Nil;
+    source.getLines.foreach { line =>
+      if (!line.startsWith("#") && line.length > 7) {
+        val t1 = line.substring(0, 6);
+        var content = line.substring(7).trim;
+        var hashtags: List[String] = Nil;
+        var p: Int = content.lastIndexOf("#");
+        while (p >= 0) {
+          hashtags = content.substring(p + 1).trim :: hashtags;
+          content = content.substring(0, p).trim;
+          p = content.lastIndexOf("#");
+        }
+        stars = (t1, content, hashtags.reverse) :: stars;
+      }
+    }
+    source.close();
+    stars.reverse;
+  }.map { t =>
     ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2,
     t._2, t._3);
   }.sortBy(_._1);
