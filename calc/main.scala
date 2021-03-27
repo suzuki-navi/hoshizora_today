@@ -954,38 +954,6 @@ object Constellations {
     icrsToConstellation(lng, lat);
   }
 
-  val ecliptical = IndexedSeq(
-    ("02h00m", "この時期に南の空にいる黄道十二星座はおひつじ座です。西から東に順番に、みずがめ座、うお座、おひつじ座、おうし座、ふたご座、かに座の順に並んでいます"),
-    ("03h00m", "この時期に南の空高くにいる黄道十二星座はおうし座です。西から東に順番に、うお座、おひつじ座、おうし座、ふたご座、かに座、の順に並んでいます"),
-    ("06h00m", "この時期に南の空高くにいる黄道十二星座はふたご座です。西から東に順番に、おひつじ座、おうし座、ふたご座、かに座、しし座の順に並んでいます"),
-    ("08h00m", "この時期に南の空高くにいる黄道十二星座はかに座です。西から東に順番に、おうし座、ふたご座、かに座、しし座、おとめ座の順に並んでいます"),
-    ("09h20m", "この時期に南の空にいる黄道十二星座はしし座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座の順に並んでいます"),
-    ("12h00m", "この時期に南の空にいる黄道十二星座はおとめ座です。西から東に順番に、ふたご座、かに座、しし座、おとめ座、てんびん座、さそり座の順に並んでいます"),
-    ("14h00m", "この時期に南の空にいる黄道十二星座はてんびん座です。西から東に順番に、しし座、おとめ座、てんびん座、さそり座、いて座の順に並んでいます"),
-    ("16h00m", "この時期に南の空にいる黄道十二星座はさそり座です。西から東に順番に、おとめ座、てんびん座、さそり座、いて座、やぎ座の順に並んでいます"),
-    ("17h40m", "この時期に南の空にいる黄道十二星座はいて座です。西から東に順番に、てんびん座、さそり座、いて座、やぎ座、みずがめ座の順に並んでいます"),
-    ("20h00m", "この時期に南の空にいる黄道十二星座はやぎ座です。西から東に順番に、いて座、やぎ座、みずがめ座、うお座の順に並んでいます"),
-    ("22h00m", "この時期に南の空にいる黄道十二星座はみずがめ座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座の順に並んでいます"),
-    ("23h20m", "この時期に南の空にいる黄道十二星座はうお座です。西から東に順番に、やぎ座、みずがめ座、うお座、おひつじ座、おうし座、ふたご座の順に並んでいます"),
-    ("24h00m", ""),
-  );
-
-  val season = IndexedSeq(
-    ("01h00m", "冬のダイヤモンドは東の空から昇ってきています"),
-    ("03h00m", "冬のダイヤモンドは南東の空にいます"),
-    ("04h40m", "冬のダイヤモンドは南の空高くにいます"),
-    ("07h20m", "冬のダイヤモンドは南西の空にいます"),
-    ("09h00m", "冬のダイヤモンドは西の空に沈みかけています。東の空には春の大三角形がいます"),
-    ("10h00m", ""),
-    ("16h20m", "夏の大三角形は東の空にいます"),
-    ("17h20m", "夏の大三角形は東の空高くにいます"),
-    ("18h00m", "夏の大三角形は頭上空高くにいます"),
-    ("21h00m", "夏の大三角形は西の空高くにいます"),
-    ("22h00m", "夏の大三角形は西の空にいます"),
-    ("23h20m", ""),
-    ("24h00m", ""),
-  );
-
   def siderealTimeToConstellation(siderealTime: Double, data: IndexedSeq[(String, String)]): String = {
     val lng5 = (siderealTime * PI57 / 5).toInt * 5;
     val key = "%02dh%02dm".format(lng5 / 15, lng5 % 15 * 4);
@@ -2357,39 +2325,15 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 // 星座
 //==============================================================================
 
-def tweetConstellations(data: IndexedSeq[(String, String)], span: Int, startDay: Int): Unit = {
-  val altHor = -0.90 / PI57;
-  val hashtag = " #星空";
-  var nextDay: Int = startDay;
-  (0 until period).foreach { day =>
-    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-    if (day >= nextDay && getTweets(startTime + day).isEmpty2) {
-      val time = startTime + day + 21.0 / 24.0;
-      val sid = hcs.siderealTime(time);
-      val cons = Constellations.siderealTimeToConstellation(sid, data);
-      if (cons != "") {
-        val msg = if (calcPlanetXyzAziAlt(time, JplData.Moon)._3 >= altHor) {
-          cons;
-        } else {
-          cons + "。月明かりなし";
-        }
-        putTweet(time, msg + hashtag);
-      }
-      nextDay = day + span;
-    }
-  }
-}
-tweetConstellations(Constellations.season, 7, 36); // PERIOD
-
 {
   import Ordering.Double.IeeeOrdering;
   case class StarTweetContent(time: Double, message: String, hashtags2: List[String]) extends TweetContent {
     def hashtags: List[String] = "星空" :: hashtags2;
     def starNames: List[String] = Nil;
   }
-  val stars = {
+  val (stars, starsB) = {
     val source = scala.io.Source.fromFile(constellationsDataPath);
-    var stars: List[(String, String, List[String])] = Nil;
+    var stars: List[(Double, String, List[String])] = Nil;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val t1 = line.substring(0, 6);
@@ -2401,53 +2345,81 @@ tweetConstellations(Constellations.season, 7, 36); // PERIOD
           content = content.substring(0, p).trim;
           p = content.lastIndexOf("#");
         }
-        stars = (t1, content, hashtags.reverse) :: stars;
+        val ra = (t1.substring(0, 2).toInt.toDouble + t1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
+        stars = (ra, content, hashtags.reverse) :: stars;
       }
     }
     source.close();
-    stars.reverse;
-  }.map { t =>
-    ((t._1.substring(0, 2).toInt.toDouble + t._1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2,
-    t._2, t._3);
-  }.sortBy(_._1);
+    val starsA = stars.filter(!_._2.startsWith("B")).reverse.toIndexedSeq.sortBy(_._1);
+    val starsB = stars.filter(_._2.startsWith("B")).reverse.toIndexedSeq.sortBy(_._1).map(t => (t._1, t._2.substring(2), t._3));
+    (starsA, starsB);
+  }
 
   val altHor = -0.90 / PI57;
 
-  var index: Int = -1;
-  (52 until period).foreach { day => // PERIOD
-    val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-    if (index < 0) {
-      val time = startTime + day + 21.0 / 24.0; // PERIOD
-      val sid = hcs.siderealTime(time);
-      index = stars.indexWhere(_._1 > sid);
+  {
+    var index: Int = -1;
+    (52 until period).foreach { day => // PERIOD
+      val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
       if (index < 0) {
-        index = 0;
-      }
-    } else {
-      val time = startTime + day + 21.0 / 24.0;
-      val sid = hcs.siderealTime(time);
-      val time0 = if (MathLib.circleAdd(sid, -stars(index)._1) >= 0) {
-        time;
-      } else if (getTweets(time).isEmpty2) {
-        val sid2 = MathLib.circleAdd(sid, PI2 / 12);
-        if (MathLib.circleAdd(sid2, -stars(index)._1) >= 0) {
-          time + MathLib.circleAdd(stars(index)._1, -sid) / PI2;
+        val time = startTime + day + 21.0 / 24.0; // PERIOD
+        val sid = hcs.siderealTime(time);
+        index = stars.indexWhere(_._1 > sid);
+        if (index < 0) {
+          index = 0;
+        }
+      } else {
+        val time = startTime + day + 21.0 / 24.0;
+        val sid = hcs.siderealTime(time);
+        val time0 = if (MathLib.circleAdd(sid, -stars(index)._1) >= 0) {
+          time;
+        } else if (getTweets(time).isEmpty2) {
+          val sid2 = MathLib.circleAdd(sid, PI2 / 12);
+          if (MathLib.circleAdd(sid2, -stars(index)._1) >= 0) {
+            time + MathLib.circleAdd(stars(index)._1, -sid) / PI2;
+          } else {
+            0.0;
+          }
         } else {
           0.0;
         }
-      } else {
-        0.0;
-      }
-      if (time0 > 0.0) {
-        val msg = if (calcPlanetXyzAziAlt(time0, JplData.Moon)._3 >= altHor) {
-          stars(index)._2;
-        } else {
-          stars(index)._2 + "。月明かりなし";
+        if (time0 > 0.0) {
+          val msg = if (calcPlanetXyzAziAlt(time0, JplData.Moon)._3 >= altHor) {
+            stars(index)._2;
+          } else {
+            stars(index)._2 + "。月明かりなし";
+          }
+          putTweet(StarTweetContent(time0, msg, stars(index)._3));
+          index += 1;
+          if (index == stars.size) {
+            index = 0;
+          }
         }
-        putTweet(StarTweetContent(time0, msg, stars(index)._3));
-        index += 1;
-        if (index == stars.size) {
+      }
+    }
+  }
+
+  {
+    var index: Int = -1;
+    (52 until period).foreach { day => // PERIOD
+      val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+      if (index < 0) {
+        val time = startTime + day + 21.0 / 24.0; // PERIOD
+        val sid = hcs.siderealTime(time);
+        index = starsB.indexWhere(_._1 > sid);
+        if (index < 0) {
           index = 0;
+        }
+      } else {
+        val time = startTime + day + 21.0 / 24;
+        val sid = hcs.siderealTime(time);
+        if (MathLib.circleAdd(sid, -starsB(index)._1) >= 0) {
+          val msg = starsB(index)._2;
+          putTweet(StarTweetContent(time - 9.0 / 24, msg, starsB(index)._3));
+          index += 1;
+          if (index == starsB.size) {
+            index = 0;
+          }
         }
       }
     }
