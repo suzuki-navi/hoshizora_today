@@ -1464,7 +1464,7 @@ val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
 def isNightTime0(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
-  time - time.toInt >= 6.0 / 24 && time - time.toInt < 15.0 / 24;
+  time - time.toInt >= 5.0 / 24 && time - time.toInt < 15.0 / 24;
 }
 
 def isNightTime1(time: Double): Boolean = {
@@ -2328,30 +2328,37 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 {
   import Ordering.Double.IeeeOrdering;
   case class StarTweetContent(time: Double, message: String, hashtags2: List[String]) extends TweetContent {
-    def hashtags: List[String] = "星空" :: hashtags2;
+    def hashtags: List[String] = hashtags2 ::: "星空" :: "星座" :: Nil;
     def starNames: List[String] = Nil;
   }
-  val (stars, starsB) = {
+  val (starsA, starsB) = {
     val source = scala.io.Source.fromFile(constellationsDataPath);
-    var stars: List[(Double, String, List[String])] = Nil;
+    var stars: List[(Double, String, List[String], String)] = Nil;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val t1 = line.substring(0, 6);
-        var content = line.substring(7).trim;
+        var content0 = line.substring(7).trim;
         var hashtags: List[String] = Nil;
-        var p: Int = content.lastIndexOf("#");
+        var p: Int = content0.lastIndexOf("#");
         while (p >= 0) {
-          hashtags = content.substring(p + 1).trim :: hashtags;
-          content = content.substring(0, p).trim;
-          p = content.lastIndexOf("#");
+          hashtags = content0.substring(p + 1).trim :: hashtags;
+          content0 = content0.substring(0, p).trim;
+          p = content0.lastIndexOf("#");
         }
         val ra = (t1.substring(0, 2).toInt.toDouble + t1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
-        stars = (ra, content, hashtags.reverse) :: stars;
+        val content = if (content0.startsWith("A ")) {
+          (content0.substring(2), "A");
+        } else if (content0.startsWith("B ")) {
+          (content0.substring(2), "B");
+        } else {
+          (content0, "A");
+        }
+        stars = (ra, content._1, hashtags.reverse, content._2) :: stars;
       }
     }
     source.close();
-    val starsA = stars.filter(!_._2.startsWith("B")).reverse.toIndexedSeq.sortBy(_._1);
-    val starsB = stars.filter(_._2.startsWith("B")).reverse.toIndexedSeq.sortBy(_._1).map(t => (t._1, t._2.substring(2), t._3));
+    val starsA = stars.filter(_._4 == "A").reverse.toIndexedSeq.sortBy(_._1).map(t => (t._1, t._2, t._3));
+    val starsB = stars.filter(_._4 == "B").reverse.toIndexedSeq.sortBy(_._1).map(t => (t._1, t._2, t._3));
     (starsA, starsB);
   }
 
@@ -2364,19 +2371,19 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       if (index < 0) {
         val time = startTime + day + 21.0 / 24.0; // PERIOD
         val sid = hcs.siderealTime(time);
-        index = stars.indexWhere(_._1 > sid);
+        index = starsA.indexWhere(_._1 > sid);
         if (index < 0) {
           index = 0;
         }
       } else {
         val time = startTime + day + 21.0 / 24.0;
         val sid = hcs.siderealTime(time);
-        val time0 = if (MathLib.circleAdd(sid, -stars(index)._1) >= 0) {
+        val time0 = if (MathLib.circleAdd(sid, -starsA(index)._1) >= 0) {
           time;
         } else if (getTweets(time).isEmpty2) {
           val sid2 = MathLib.circleAdd(sid, PI2 / 12);
-          if (MathLib.circleAdd(sid2, -stars(index)._1) >= 0) {
-            time + MathLib.circleAdd(stars(index)._1, -sid) / PI2;
+          if (MathLib.circleAdd(sid2, -starsA(index)._1) >= 0) {
+            time + MathLib.circleAdd(starsA(index)._1, -sid) / PI2;
           } else {
             0.0;
           }
@@ -2385,13 +2392,13 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         }
         if (time0 > 0.0) {
           val msg = if (calcPlanetXyzAziAlt(time0, JplData.Moon)._3 >= altHor) {
-            stars(index)._2;
+            starsA(index)._2;
           } else {
-            stars(index)._2 + "。月明かりなし";
+            starsA(index)._2 + "。月明かりなし";
           }
-          putTweet(StarTweetContent(time0, msg, stars(index)._3));
+          putTweet(StarTweetContent(time0, msg, starsA(index)._3));
           index += 1;
-          if (index == stars.size) {
+          if (index == starsA.size) {
             index = 0;
           }
         }
@@ -2415,7 +2422,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         val sid = hcs.siderealTime(time);
         if (MathLib.circleAdd(sid, -starsB(index)._1) >= 0) {
           val msg = starsB(index)._2;
-          putTweet(StarTweetContent(time - 9.0 / 24, msg, starsB(index)._3));
+          putTweet(StarTweetContent(time - 9.0 / 24 + 5.0 / 60 / 24, msg, starsB(index)._3));
           index += 1;
           if (index == starsB.size) {
             index = 0;
