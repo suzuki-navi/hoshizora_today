@@ -2282,41 +2282,40 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 //==============================================================================
 
 {
-  var moonCons: List[(Double, Array[Double])] = Nil;
   val altThres = 10 / PI57;
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
     if (!getTweets(time).nightTweets.flatMap(_.starNames).contains("月")) {
-      val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
-      if (alt >= altThres) {
-        val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
-        val moonPhase = calcMoonPhase(time);
-        putTweet(time, "%s月は%sにいます。月相 %.1f/28".format(conscomment, cons, moonPhase) +
-          hashtags.map(" #" + _).mkString);
-      } else {
-        val time = startTime + d + 23.0 / 24.0;
+      {
         val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
         if (alt >= altThres) {
+          Some((time, xyz, azi, alt));
+        } else {
+          val time = startTime + d + 23.0 / 24.0;
+          val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
+          if (alt >= altThres) {
+            Some((time, xyz, azi, alt));
+          } else {
+            None;
+          }
+        }
+      } match {
+        case None => ;
+        case Some((time, xyz, azi, alt)) =>
           val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
           val moonPhase = calcMoonPhase(time);
           putTweet(time, "%s月は%sにいます。月相 %.1f/28".format(conscomment, cons, moonPhase) +
             hashtags.map(" #" + _).mkString);
-          }
       }
     }
   }
-  moonCons;
 }
 
-val planetCons: List[(Double, String, Array[Double])] = {
-  var planetCons: List[(Double, String, Array[Double])] = Nil;
+{
   val altThres = 10 / PI57;
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0;
     val wday = TimeLib.wday(time);
-    val ut1 = time; // 近似的
-    val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val (planetName, targetPlanet) = if (wday == 2) {
       ("火星", Some(JplData.Mars));
     } else if (wday == 4) {
@@ -2329,32 +2328,29 @@ val planetCons: List[(Double, String, Array[Double])] = {
     targetPlanet match {
       case None => ;
       case Some(targetPlanet) =>
-        val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-        val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
-        val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(planet2, ut1);
-        if (alt >= altThres) {
-          planetCons = (time, planetName, planet) :: planetCons;
-        } else {
-          val time = startTime + d + 23.0 / 24.0;
-          val ut1 = time; // 近似的
-          val tdb = TimeLib.mjdutcToTdb(time);
-          val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-          val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-          val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
-          val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(planet2, ut1);
+        {
+          val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
           if (alt >= altThres) {
-            planetCons = (time, planetName, planet) :: planetCons;
+            Some((time, xyz, azi, alt));
+          } else {
+            val time = startTime + d + 23.0 / 24.0;
+            val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
+            if (alt >= altThres) {
+              Some((time, xyz, azi, alt));
+            } else {
+              None;
+            }
           }
+        } match {
+          case None => ;
+          case Some((time, xyz, azi, alt)) =>
+            val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+            val moonPhase = calcMoonPhase(time);
+            putTweet(time - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName) +
+              hashtags.map(" #" + _).mkString);
         }
     }
   }
-  planetCons;
-}
-
-planetCons.foreach { case (time, planetName, xyz) =>
-  val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
-  putTweet(TimeLib.floor(time, 24) - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName) +
-    hashtags.map(" #" + _).mkString);
 }
 
 //==============================================================================
