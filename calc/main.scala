@@ -799,12 +799,12 @@ object Constellations {
     " 3h40m, 15" -> ("おうし座すばるの南", List("プレアデス星団")),
     " 3h40m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
 
-    " 4h00m, 15" -> ("おうし座ヒアデスの西", Nil),
+    " 4h00m, 15" -> ("おうし座ヒアデス星団の西", Nil),
     " 4h00m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
 
     " 4h20m, 20" -> ("おうし座とペルセウス座とぎょしゃ座の間", Nil),
 
-    " 4h40m, 20" -> ("おうし座ヒアデスの北東", Nil),
+    " 4h40m, 20" -> ("おうし座ヒアデス星団の北東", Nil),
 
     " 5h00m, 20" -> ("おうし座の角付近", Nil),
 
@@ -975,7 +975,7 @@ object Constellations {
     ("04h40m", "冬のダイヤモンドは南の空高くにいます"),
     ("07h20m", "冬のダイヤモンドは南西の空にいます"),
     ("09h00m", "冬のダイヤモンドは西の空に沈みかけています。東の空には春の大三角形がいます"),
-    ("11h00m", ""),
+    ("10h00m", ""),
     ("16h20m", "夏の大三角形は東の空にいます"),
     ("17h20m", "夏の大三角形は東の空高くにいます"),
     ("18h00m", "夏の大三角形は頭上空高くにいます"),
@@ -1619,7 +1619,10 @@ def putTweet(time: Double, msg: String): Unit = {
   putTweet(LegacyTweetContent(time, msg));
 }
 
+//==============================================================================
 // 24節気
+//==============================================================================
+
 {
   val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, startTime, endTime, 3.0, 24) { time =>
     val utc = time;
@@ -1723,9 +1726,9 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
         val timePrev = sunsetTimes(day - 7);
         val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
         if (d > 0) {
-          "日没は%sごろです。先週から約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
+          "日没は%sごろです。この1週間で約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
         } else if (d < 0) {
-          "日没は%sごろです。先週から約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
+          "日没は%sごろです。この1週間で約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
         } else {
           "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
         }
@@ -1744,9 +1747,9 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
         val timePrev = sunsetTimes(day - 7);
         val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
         if (d > 0) {
-          "日没は%sごろで、先週から約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
+          "日没は%sごろで、この1週間で約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
         } else if (d < 0) {
-          "日没は%sごろで、先週から約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
+          "日没は%sごろで、この1週間で約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
         } else {
           "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
         }
@@ -1877,40 +1880,16 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
 //==============================================================================
 
 {
-  val termStrs = IndexedSeq(
-    "新月",
-    "月相 3.5/28。新月と上弦の中間です\uD83C\uDF12",
-    "上弦の月\uD83C\uDF13。月相 7/28",
-    "月相 10.5/28。上弦と満月の中間です\uD83C\uDF14",
-    "満月\uD83C\uDF15。月相 14/28",
-    "月相 17.5/28。満月と下弦の中間です\uD83C\uDF16",
-    "下弦の月\uD83C\uDF17。月相 21/28",
-    "月相 24.5/28。下弦と新月の中間です\uD83C\uDF18",
-  );
-  case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, cons: Option[(String, String, List[String])]) extends TweetContent {
+  case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, distanceFlag: Int,
+    cons: Option[(String, String, List[String])]) extends TweetContent {
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = {
-      cons match {
-        case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます".format(conscomment, termStrs(term), cons);
-        case None => termStrs(term);
-      }
-    }
-    def hashtags: List[String] = {
-      cons match {
-        case Some((conscomment, cons, hashtags)) => hashtags;
-        case None => Nil;
-      }
-    }
-    def starNames: List[String] = List("月");
-  }
-  case class FullMoonDistanceTweetContent(rawTime: Double, flag: Boolean, cons: Option[(String, String, List[String])]) extends TweetContent {
-    // true: 近い, false: 遠い
-    def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
-    def message: String = {
-      val msg = if (flag) {
-        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です";
+      val msg = if (term == 4 && distanceFlag < 0) {
+        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です。月相 14/28";
+      } else if (term == 4 && distanceFlag > 0) {
+        "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です。月相 14/28";
       } else {
-        "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です";
+        termStrs(term);
       }
       cons match {
         case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます".format(conscomment, msg, cons);
@@ -1924,6 +1903,16 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
       }
     }
     def starNames: List[String] = List("月");
+    private[this] val termStrs = IndexedSeq(
+      "新月",
+      "月相 3.5/28。新月と上弦の中間です\uD83C\uDF12",
+      "上弦の月\uD83C\uDF13。月相 7/28",
+      "月相 10.5/28。上弦と満月の中間です\uD83C\uDF14",
+      "満月\uD83C\uDF15。月相 14/28",
+      "月相 17.5/28。満月と下弦の中間です\uD83C\uDF16",
+      "下弦の月\uD83C\uDF17。月相 21/28",
+      "月相 24.5/28。下弦と新月の中間です\uD83C\uDF18",
+    );
   }
 
   val altThres0 = 10 / PI57;
@@ -1958,16 +1947,16 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
     fullMoonsDistanceMaxMinUpDownFlags.zipWithIndex.map { case (flag, idx) =>
       val time = fullMoons(idx);
       if (flag == 1) {
-        FullMoonDistanceTweetContent(time, false, calcMoonConstellation(time));
+        MoonPhaseTermTweetContent(time, 4, +1, calcMoonConstellation(time));
       } else if (flag == 3) {
-        FullMoonDistanceTweetContent(time, true, calcMoonConstellation(time));
+        MoonPhaseTermTweetContent(time, 4, -1, calcMoonConstellation(time));
       } else {
-        MoonPhaseTermTweetContent(time, 4, calcMoonConstellation(time));
+        MoonPhaseTermTweetContent(time, 4, 0, calcMoonConstellation(time));
       }
     }.foreach(putTweet);
   }
   moonPhaseTerms.filter(_._2 != 4).map { case (time, term) =>
-    MoonPhaseTermTweetContent(time, term, calcMoonConstellation(time));
+    MoonPhaseTermTweetContent(time, term, 0, calcMoonConstellation(time));
   }.foreach(putTweet);
 }
 
