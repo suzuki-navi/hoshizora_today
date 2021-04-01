@@ -116,27 +116,26 @@ class JplData(dataPath: String) {
     (jplData(periodIndex), time2 - periodIndex);
   }
 
-  private[this] def calcChebyshevArr(count: Int, x: Double): Array[Double] = {
-    val arr = new Array[Double](count);
-    val x2 = 2.0 * x;
-    arr(0) = 1.0;
-    arr(1) = x;
-    var i: Int = 2;
-    while (i < count) {
-      arr(i) = x2 * arr(i-1) - arr(i-2);
-      i = i + 1;
+  private[this] def calcChebyshev(cs: IndexedSeq[Double], x: Double): Double = {
+    // x は -1.0 <= x <= +1.0
+    val n = cs.size;
+    if (n == 1) {
+      cs(0);
+    } else {
+      val x2 = 2.0 * x;
+      var result: Double = cs(0) + cs(1) * x;
+      var i: Int = 2;
+      var t0: Double = 1.0;
+      var t1: Double = x;
+      while (i < n) {
+        val t2 = x2 * t1 - t0;
+        result += cs(i) * t2;
+        t0 = t1;
+        t1 = t2;
+        i = i + 1;
+      }
+      result;
     }
-    arr;
-  }
-
-  private[this] def calcChebyshev(periodData: IndexedSeq[Double], offset: Int, count: Int, arr: Array[Double]): Double = {
-    var result: Double = 0.0;
-    var i: Int = 0;
-    while (i < count) {
-      result += periodData(offset + i) * arr(i);
-      i = i + 1;
-    }
-    result;
   }
 
   def calcPlanetPosition(time: Double, planet: JplData.JplPlanet): Array[Double] = {
@@ -146,11 +145,10 @@ class JplData(dataPath: String) {
     val time4 = 2.0 * (time3 - subPeriodIndex) - 1.0;
     val coefficientCount = planet.coefficientCount;
     val offset = 3 * coefficientCount * subPeriodIndex + planet.dataOffset;
-    val charr = calcChebyshevArr(coefficientCount, time4);
     val ret = new Array[Double](3);
-    ret(0) = calcChebyshev(periodData, offset                       , coefficientCount, charr);
-    ret(1) = calcChebyshev(periodData, offset + 1 * coefficientCount, coefficientCount, charr);
-    ret(2) = calcChebyshev(periodData, offset + 2 * coefficientCount, coefficientCount, charr);
+    ret(0) = calcChebyshev(periodData.slice(offset + 0 * coefficientCount, offset + 1 * coefficientCount), time4);
+    ret(1) = calcChebyshev(periodData.slice(offset + 1 * coefficientCount, offset + 2 * coefficientCount), time4);
+    ret(2) = calcChebyshev(periodData.slice(offset + 2 * coefficientCount, offset + 3 * coefficientCount), time4);
     ret;
   }
 
