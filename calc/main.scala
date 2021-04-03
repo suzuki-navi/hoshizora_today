@@ -231,12 +231,7 @@ object TimeLib {
   }
 
   def wday(time: Double): Int = {
-    val wday1 = (time + (9.0 / 24.0 + 0.5 / 86400.0)).toInt % 7;
-    if (wday1 >= 4) {
-      wday1 - 4;
-    } else {
-      wday1 + 3;
-    }
+    ((time + (9.0 / 24.0 + 0.5 / 86400.0)).toInt + 3) % 7;
   }
 
   private def offsetDateTime(time: Double): OffsetDateTime = {
@@ -280,6 +275,43 @@ object TimeLib {
       }
     } else {
       t1 + (t2 * stepCountPerDay + 0.5).toInt.toDouble / stepCountPerDay;
+    }
+  }
+
+  // "来年1月"
+  def monthString(time0: Double, time1: Double, time2: Double): String = {
+    def sub(time: Double): (Int, Int) = {
+      val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
+      val year = str.substring(0, 4);
+      val month = str.substring(5, 7);
+      (year.toInt, month.toInt);
+    }
+    val (y0, m0) = sub(time0);
+    val (y1, m1) = sub(time1);
+    val (y2, m2) = sub(time2);
+    val s1 = if (y0 == y1 && m0 == m1) {
+      "今月";
+    } else if (y0 == y1 && m0 + 1 == m1 || y0 + 1 == y1 && m0 - 11 == m1) {
+      "来月"
+    } else {
+      (if (y0 == y1) {
+        "";
+      } else if (y0 + 1 == y1) {
+        "来年";
+      } else {
+        "%d年".format(y1);
+      }) + "%d月".format(m1);
+    }
+    if (y1 == y2 && m1 == m2) {
+      s1;
+    } else {
+      s1 + "から" + (if (y0 == y2) {
+        "";
+      } else if (y0 + 1 == y1) {
+        "来年";
+      } else {
+        "%d年".format(y2);
+      }) + "%d月".format(m2) + "にかけて";
     }
   }
 
@@ -2034,6 +2066,22 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   def hashtags: List[String] = List(planetName);
   def starNames: List[String] = List(planetName);
 }
+case class SunsetNextPlanetTweetContent(time: Double, planetName: String,
+  nextDay1: Double, nextDay2: Double) extends TweetContent {
+  def message: String = {
+    if (nextDay1 < 0.0) {
+      "%sが次に日没時に見えやすくなるのはERRORです".format(planetName);
+    } else if (nextDay2 < 0.0) {
+      "%sが次に日没時に見えやすくなるのは%sからERRORです".format(planetName,
+        TimeLib.monthString(time, nextDay1, nextDay1));
+    } else {
+      "%sが次に日没時に見えやすくなるのは%sです".format(planetName,
+        TimeLib.monthString(time, nextDay1, nextDay2));
+    }
+  }
+  def hashtags: List[String] = List(planetName);
+  def starNames: List[String] = List(planetName);
+}
 case class SunsetStarTweetContent(day: Int, starName: String,
   azi: Double, alt: Double) extends OnSunsetTweetContent {
   def alt360: Int = (alt * PI57 + 0.5).toInt;
@@ -2118,6 +2166,13 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
   }
 }
 
+val innerPlanets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
+val innerPlanetsSunsetAziAltList = innerPlanets.map { planet =>
+  (0 until period).map { day =>
+    calcPlanetOnSunsetTime(day, planet._2);
+  }
+}
+
 // 水曜・金曜
 {
   val aziThres0 = 200 / PI57;
@@ -2125,16 +2180,16 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
   val altThres0 = 10 / PI57;
 
   val planets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
-  (1 until period).foreach { day =>
-    val wday = TimeLib.wday(startTime + day);
-    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
-    planets.foreach { p =>
-      if (wday == p._3 && !sunsetTweets.exists(_.starNames.contains(p._1))) {
-        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-        if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-          val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
+  innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
+    (1 until period).foreach { day =>
+      val wday = TimeLib.wday(startTime + day);
+      val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+      if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
+        val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
+        if (alt >= altThres0) {
+          val prevAlt = innerPlanetsSunsetAziAltList(pi)(day - 1)._2;
           val isIncreasing = (alt >= prevAlt);
-          putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
+          putTweet(SunsetPlanetTweetContent(day, planet._1, azi, alt, isIncreasing, false));
         }
       }
     }
@@ -2177,6 +2232,40 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
             putTweet(SunsetStarTweetContent(day, p._1, azi, alt));
           }
       };
+    }
+  }
+}
+
+// 水曜・金曜だけど水星・金星が見えない場合
+{
+  val aziThres0 = 200 / PI57;
+  val aziThres1 = 315 / PI57;
+  val altThres0 = 10 / PI57;
+  val altThres1 = 15 / PI57;
+
+  innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
+    (1 until period).foreach { day =>
+      if ((startTime + day).toInt % 2 == 0) {
+        val wday = TimeLib.wday(startTime + day);
+        val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+        if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
+          val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
+          if (alt < altThres0) {
+            val time = startTime + day + 12.5 / 24;
+            val p1 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 >= altThres1, day);
+            if (p1 >= 0) {
+              val p2 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 < altThres1, p1);
+              if (p2 >= 0) {
+                putTweet(SunsetNextPlanetTweetContent(time, planet._1, startTime + p1, startTime + p2));
+              } else {
+                putTweet(SunsetNextPlanetTweetContent(time, planet._1, startTime + p1, -1));
+              }
+            } else {
+              putTweet(SunsetNextPlanetTweetContent(time, planet._1, -1, -1));
+            }
+          }
+        }
+      }
     }
   }
 }
