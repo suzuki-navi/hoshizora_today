@@ -1622,16 +1622,16 @@ val outerPlanetsNightAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = oute
 
 //==============================================================================
 
+def isDayTime(time: Double): Boolean = {
+  val day = (time - startTime).toInt;
+  val s = sunsetTimes(day);
+  time - time.toInt >= 0.0 / 24 && time < s; // 9時～日没
+}
+
 def isNightTime0(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
   //time - time.toInt >= 5.0 / 24 && time - time.toInt < 15.0 / 24;
-  time >= s && time - time.toInt < 15.0 / 24;
-}
-
-def isNightTime1(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
-  val s = sunsetTimes(day);
   time >= s && time - time.toInt < 15.0 / 24;
 }
 
@@ -1700,16 +1700,19 @@ case class LegacyTweetContent(time: Double, message: String) extends  TweetConte
   def starNames: List[String] = Nil;
 }
 
-case class DateTweets(otherTweets: List[TweetContent], sunsetTweets: List[OnSunsetTweetContent],
+case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[TweetContent],
+  sunsetTweets: List[OnSunsetTweetContent],
   nightTweets: List[TweetContent]) {
-  def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && nightTweets.isEmpty;
+  def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && daytimeTweets.isEmpty && nightTweets.isEmpty;
   def isEmpty2: Boolean = sunsetTweets.isEmpty && nightTweets.isEmpty;
   def added(tc: TweetContent): DateTweets = {
     tc match {
       case tc: OnSunsetTweetContent =>
         this.copy(sunsetTweets = tc :: this.sunsetTweets);
       case _ =>
-        if (isNightTime0(tc.time)) {
+        if (isDayTime(tc.time)) {
+          this.copy(daytimeTweets = tc :: this.daytimeTweets);
+        } else if (isNightTime0(tc.time)) {
           this.copy(nightTweets = tc :: this.nightTweets);
         } else {
           this.copy(otherTweets = tc :: this.otherTweets);
@@ -1724,13 +1727,13 @@ case class DateTweets(otherTweets: List[TweetContent], sunsetTweets: List[OnSuns
       sunsetTweets.head :: Nil;
     } else {
       MultiSunsetTweetContent(sunsetTweets.head.day, sunsetTweets.reverse) :: Nil;
-    }) ::: otherTweets ::: nightTweets).sortBy(_.time);
+    }) ::: otherTweets ::: daytimeTweets ::: nightTweets).sortBy(_.time);
   }
 }
 
 var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
   val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
-  (date, DateTweets(Nil, Nil, Nil));
+  (date, DateTweets(Nil, Nil, Nil, Nil));
 }.toMap;
 
 def getTweets(time: Double): DateTweets = {
@@ -2646,8 +2649,7 @@ tweetMoonRiseSet();
 
   {
     var index: Int = -1;
-    (52 until period).foreach { day => // PERIOD
-      val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+    (64 until period).foreach { day => // PERIOD
       if (index < 0) {
         val time = startTime + day + 21.0 / 24.0; // PERIOD
         val sid = hcs.siderealTime(time);
@@ -2687,28 +2689,36 @@ tweetMoonRiseSet();
   }
 
   {
-    var index: Int = -1;
-    (52 until period).foreach { day => // PERIOD
-      val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+    var day1: Int = 62; // PERIOD
+    var day2: Int = 62; // PERIOD
+    var index: Int = {
+      val time = startTime + day1 + 21.0 / 24.0; // PERIOD
+      val sid = hcs.siderealTime(time);
+      val index = starsB.indexWhere(_._1 > sid);
       if (index < 0) {
-        val time = startTime + day + 21.0 / 24.0; // PERIOD
-        val sid = hcs.siderealTime(time);
-        index = starsB.indexWhere(_._1 > sid);
-        if (index < 0) {
+        0;
+      } else {
+        index;
+      }
+    }
+    while (day1 < period) {
+      val sid = hcs.siderealTime(startTime + day1 + 21.0 / 24);
+      if (MathLib.circleAdd(sid, -starsB(index)._1) >= 0) {
+        val msg = starsB(index)._2;
+        {
+          val p = (day1 until (day2 + 7)).indexWhere { d =>
+            getTweets(startTime + d).daytimeTweets.isEmpty;
+          }
+          day1 = if (p < 0) day1 else day1 + p;
+        }
+        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, starsB(index)._3));
+        index += 1;
+        if (index == starsB.size) {
           index = 0;
         }
-      } else {
-        val time = startTime + day + 21.0 / 24;
-        val sid = hcs.siderealTime(time);
-        if (MathLib.circleAdd(sid, -starsB(index)._1) >= 0) {
-          val msg = starsB(index)._2;
-          putTweet(StarTweetContent(time - 9.0 / 24 + 5.0 / 60 / 24, msg, starsB(index)._3));
-          index += 1;
-          if (index == starsB.size) {
-            index = 0;
-          }
-        }
       }
+      day1 += 1;
+      day2 += 1;
     }
   }
 }
@@ -2719,9 +2729,8 @@ tweetMoonRiseSet();
 {
   (0 until period).foreach { day =>
     val time = startTime + day;
-    val date = TimeLib.modifiedJulianDayToStringJSTDate(time);
     if (getTweets(time).isEmpty) {
-      putTweet(time, "#empty".format(date));
+      putTweet(time, "#empty");
     }
   }
 }
