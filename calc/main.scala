@@ -796,6 +796,51 @@ class Hcs(lng: Double, lat: Double) {
 
 }
 
+object Hcs {
+
+  def aziAltToNaturalString(azi: Double, alt: Double): String = {
+    val altHor = -0.90 / PI57;
+    if (alt < altHor) {
+      "ERROR";
+    } else {
+      val alt360 = alt * PI57;
+      if (alt360 >= 80) {
+        "天頂付近";
+      } else {
+        val azi360 = azi * PI57;
+        val s1 = if (azi360 <= 22.5 || azi360 >= 337.5) {
+          "北の空";
+        } else if (azi360 < 67.5) {
+          "北東の空";
+        } else if (azi360 > 292.5) {
+          "北西の空";
+        } else if (azi360 <= 112.5) {
+          "東の空";
+        } else if (azi360 >= 247.5) {
+          "西の空";
+        } else if (azi360 < 157.5) {
+          "南東の空";
+        } else if (azi360 > 202.5) {
+          "南西の空";
+        } else {
+          "南の空";
+        }
+        val s2 = if (alt360 < 10.0) {
+          "地平線近く";
+        } else if (alt360 < 30.0) {
+          "低く";
+        } else if (alt360 >= 60.0) {
+          "高く";
+        } else {
+          "";
+        }
+        s1 + s2;
+      }
+    }
+  }
+
+}
+
 object Constellations {
   val constellationsMap = Map[String, (String, List[String])] (
     " 0h00m, -5" -> ("うお座の西側の魚(ペガスス座の南)の南", Nil),
@@ -2560,7 +2605,8 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           case Some((time, xyz, azi, alt)) =>
             val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
             val moonPhase = calcMoonPhase(time);
-            putTweet(time - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName) +
+            val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
+            putTweet(time - 1.0 / (24 * 4), "%s%sは%s、%sにいます #%s".format(conscomment, planetName, hcsStr, cons, planetName) +
               hashtags.map(" #" + _).mkString);
         }
     }
