@@ -305,9 +305,9 @@ object TimeLib {
     if (y1 == y2 && m1 == m2) {
       s1;
     } else {
-      s1 + "から" + (if (y0 == y2) {
+      s1 + "から" + (if (y0 == y2 || y1 == y2) {
         "";
-      } else if (y0 + 1 == y1) {
+      } else if (y0 + 1 == y2) {
         "来年";
       } else {
         "%d年".format(y2);
@@ -1592,6 +1592,34 @@ val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
   MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
 }
 
+val innerPlanets = IndexedSeq(
+  ("金星", JplData.Venus, 5),
+  ("水星", JplData.Mercury, 3)
+);
+val innerPlanetsSunsetAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = innerPlanets.map { planet =>
+  (0 until period).map { day =>
+    calcPlanetOnSunsetTime(day, planet._2);
+  }
+}
+
+val outerPlanets = IndexedSeq(
+  ("火星", JplData.Mars, 2),
+  ("木星", JplData.Jupiter, 4),
+  ("土星", JplData.Saturn, 6),
+);
+val outerPlanetsNightAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = outerPlanets.map { planet =>
+  val period2 = if (planet._1 == "火星") {
+    period + 700;
+  } else {
+    period + 300;
+  }
+  (0 until period2).map { day =>
+    val time = startTime + day + 21.0 / 24.0;
+    val t = calcPlanetXyzAziAlt(time, planet._2);
+    (t._2, t._3);
+  }
+}
+
 //==============================================================================
 
 def isNightTime0(time: Double): Boolean = {
@@ -2007,6 +2035,39 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
   }
 }
 
+case class SunsetNextPlanetTweetContent(time: Double, planetName: String,
+  nextDay1: Double, nextDay2: Double) extends TweetContent {
+  def message: String = {
+    if (nextDay1 < 0.0) {
+      "%sが次に日没時に見えやすくなるのはERRORです".format(planetName);
+    } else if (nextDay2 < 0.0) {
+      "%sが次に日没時に見えやすくなるのは%sからERRORです".format(planetName,
+        TimeLib.monthString(time, nextDay1, nextDay1));
+    } else {
+      "%sが次に日没時に見えやすくなるのは%sです".format(planetName,
+        TimeLib.monthString(time, nextDay1, nextDay2));
+    }
+  }
+  def hashtags: List[String] = List(planetName);
+  def starNames: List[String] = List(planetName);
+}
+case class NightNextPlanetTweetContent(time: Double, planetName: String,
+  nextDay1: Double, nextDay2: Double) extends TweetContent {
+  def message: String = {
+    if (nextDay1 < 0.0) {
+      "%sが次に夜見えやすくなるのはERRORです(21時基準)".format(planetName);
+    } else if (nextDay2 < 0.0) {
+      "%sが次に夜見えやすくなるのは%sからERRORです(21時基準)".format(planetName,
+        TimeLib.monthString(time, nextDay1, nextDay1));
+    } else {
+      "%sが次に夜見えやすくなるのは%sです(21時基準)".format(planetName,
+        TimeLib.monthString(time, nextDay1, nextDay2));
+    }
+  }
+  def hashtags: List[String] = List(planetName);
+  def starNames: List[String] = List(planetName);
+}
+
 //==============================================================================
 // 日没時の西の空
 //==============================================================================
@@ -2062,22 +2123,6 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
     "%sは日没時の高度を徐々に上げ、約%d°にいます".format(planetName, alt360);
   } else {
     "%sは日没時の高度を徐々に下げ、約%d°にいます".format(planetName, alt360);
-  }
-  def hashtags: List[String] = List(planetName);
-  def starNames: List[String] = List(planetName);
-}
-case class SunsetNextPlanetTweetContent(time: Double, planetName: String,
-  nextDay1: Double, nextDay2: Double) extends TweetContent {
-  def message: String = {
-    if (nextDay1 < 0.0) {
-      "%sが次に日没時に見えやすくなるのはERRORです".format(planetName);
-    } else if (nextDay2 < 0.0) {
-      "%sが次に日没時に見えやすくなるのは%sからERRORです".format(planetName,
-        TimeLib.monthString(time, nextDay1, nextDay1));
-    } else {
-      "%sが次に日没時に見えやすくなるのは%sです".format(planetName,
-        TimeLib.monthString(time, nextDay1, nextDay2));
-    }
   }
   def hashtags: List[String] = List(planetName);
   def starNames: List[String] = List(planetName);
@@ -2166,13 +2211,6 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
   }
 }
 
-val innerPlanets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
-val innerPlanetsSunsetAziAltList = innerPlanets.map { planet =>
-  (0 until period).map { day =>
-    calcPlanetOnSunsetTime(day, planet._2);
-  }
-}
-
 // 水曜・金曜
 {
   val aziThres0 = 200 / PI57;
@@ -2254,7 +2292,7 @@ val innerPlanetsSunsetAziAltList = innerPlanets.map { planet =>
             val time = startTime + day + 12.5 / 24;
             val p1 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 >= altThres1, day);
             if (p1 >= 0) {
-              val p2 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 < altThres1, p1);
+              val p2 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 < altThres1, p1) - 1;
               if (p2 >= 0) {
                 putTweet(SunsetNextPlanetTweetContent(time, planet._1, startTime + p1, startTime + p2));
               } else {
@@ -2522,6 +2560,37 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
             putTweet(time - 1.0 / (24 * 4), "%s%sは%sにいます #%s".format(conscomment, planetName, cons, planetName) +
               hashtags.map(" #" + _).mkString);
         }
+    }
+  }
+}
+
+// 惑星が見えない場合
+{
+  val altThres = 10 / PI57;
+
+  outerPlanets.zipWithIndex.foreach { case (planet, pi) =>
+    (0 until period).foreach { day =>
+      if ((startTime + day).toInt % 2 == 0) {
+        val wday = TimeLib.wday(startTime + day);
+        val tweets = getTweets(startTime + day).tweets;
+        if (wday == planet._3 && !tweets.exists(_.starNames.contains(planet._1))) {
+          val (azi, alt) = outerPlanetsNightAziAltList(pi)(day);
+          if (alt < altThres) {
+            val time = startTime + day + 12.5 / 24;
+            val p1 = outerPlanetsNightAziAltList(pi).indexWhere(_._2 >= altThres, day);
+            if (p1 >= 0) {
+              val p2 = outerPlanetsNightAziAltList(pi).indexWhere(_._2 < altThres, p1) - 1;
+              if (p2 >= 0) {
+                putTweet(NightNextPlanetTweetContent(time, planet._1, startTime + p1, startTime + p2));
+              } else {
+                putTweet(NightNextPlanetTweetContent(time, planet._1, startTime + p1, -1));
+              }
+            } else {
+              putTweet(NightNextPlanetTweetContent(time, planet._1, -1, -1));
+            }
+          }
+        }
+      }
     }
   }
 }
