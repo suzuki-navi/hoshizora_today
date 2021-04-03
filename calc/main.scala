@@ -2139,12 +2139,21 @@ case class MultiSunsetTweetContent(day: Int, tc: List[OnSunsetTweetContent]) ext
 }
 
 case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends OnSunsetTweetContent {
-  def azi360: Int = (azi * PI57 + 0.5).toInt;
-  def alt360: Int = (alt * PI57 + 0.5).toInt;
-  def moonPhase: Double = calcMoonPhase(sunsetTimes(day));
-  def message: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°".format(moonPhase, alt360);
-  def message2: String = "新月後の細い月は、月相 %.1f/28 で、日没時に西の空高度約%d°にいます".format(moonPhase, alt360);
-  def message3: String = "新月後の細い月は、月相 %.1f/28 で、約%d°にいます".format(moonPhase, alt360);
+  private[this] val azi360: Int = (azi * PI57 + 0.5).toInt;
+  private[this] val alt360: Int = (alt * PI57 + 0.5).toInt;
+  private[this] val moonPhase: Double = calcMoonPhase(sunsetTimes(day));
+  private[this] val moonStr: String = {
+    if (moonPhase < 1.75) {
+      "新月後の細い月";
+    } else if (moonPhase < 2.75) {
+      "三日月";
+    } else {
+      "月";
+    }
+  }
+  def message: String = "%sは、月相 %.1f/28 で、日没時に西の空高度約%d°".format(moonStr, moonPhase, alt360);
+  def message2: String = "%sは、月相 %.1f/28 で、日没時に西の空高度約%d°にいます".format(moonStr, moonPhase, alt360);
+  def message3: String = "%sは、月相 %.1f/28 で、約%d°にいます".format(moonStr, moonPhase, alt360);
   def hashtags: List[String] = Nil;
   def starNames: List[String] = List("月");
 }
@@ -2247,14 +2256,15 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
   (0 until moonPhaseTerms.size).foreach { i =>
     val (moonPhaseTime, term) = moonPhaseTerms(i);
     if (term == 0 && moonPhaseTime + 4 < endTime) {
-      val d = (0 until 4).indexWhere { d =>
+      (0 until 4).foreach { d =>
         val day = (moonPhaseTime + d - startTime).toInt;
         val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
-        alt >= altThres0;
+        if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
+          val day = (moonPhaseTime + d - startTime).toInt;
+          val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
+          putTweet(SunsetMoonTweetContent(day, azi, alt));
+        }
       }
-      val day = (moonPhaseTime + d - startTime).toInt;
-      val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
-      putTweet(SunsetMoonTweetContent(day, azi, alt));
     }
   }
 }
