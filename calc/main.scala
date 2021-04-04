@@ -1817,6 +1817,8 @@ val manualTweet = """
 2021-04-28T12:00 準惑星ハウメアが衝
 2021-04-09T12:00 準惑星マケマケが衝
 2021-10-22T12:00 準惑星エリスが衝
+
+2021-04-10T12:00 マケマケは、冥王星型天体の準惑星です。準惑星の認定は、ケレス、冥王星、エリスに次いで4つ目です。冥王星、エリスより小さく、ハウメアと同程度の大きさです。公転周期は、海王星の倍近くの307年です。かみのけ座にいます
 """;
 
 manualTweet.split("\n").foreach { line =>
@@ -1869,7 +1871,7 @@ manualTweet.split("\n").foreach { line =>
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = {
       val msg = if (term == 4 && distanceFlag < 0) {
-        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です。月相 14/28";
+        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です。スーパームーンとも呼ばれます。月相 14/28";
       } else if (term == 4 && distanceFlag > 0) {
         "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です。月相 14/28";
       } else {
@@ -2087,12 +2089,12 @@ case class SunsetNextPlanetTweetContent(time: Double, planetName: String,
   nextDay1: Double, nextDay2: Double) extends TweetContent {
   def message: String = {
     if (nextDay1 < 0.0) {
-      "%sが次に日没時に見えやすくなるのはERRORです".format(planetName);
+      "%sが次に日没時に見えやすくなるのは、ERRORです".format(planetName);
     } else if (nextDay2 < 0.0) {
-      "%sが次に日没時に見えやすくなるのは%sからERRORです".format(planetName,
+      "%sが次に日没時に見えやすくなるのは、%sからERRORです".format(planetName,
         TimeLib.monthString(time, nextDay1, nextDay1));
     } else {
-      "%sが次に日没時に見えやすくなるのは%sです".format(planetName,
+      "%sが次に日没時に見えやすくなるのは、%sです".format(planetName,
         TimeLib.monthString(time, nextDay1, nextDay2));
     }
   }
@@ -2103,12 +2105,12 @@ case class NightNextPlanetTweetContent(time: Double, planetName: String,
   nextDay1: Double, nextDay2: Double) extends TweetContent {
   def message: String = {
     if (nextDay1 < 0.0) {
-      "%sが次に夜見えやすくなるのはERRORです(21時基準)".format(planetName);
+      "%sが次に夜見えやすくなるのは、ERRORです(21時基準)".format(planetName);
     } else if (nextDay2 < 0.0) {
-      "%sが次に夜見えやすくなるのは%sからERRORです(21時基準)".format(planetName,
+      "%sが次に夜見えやすくなるのは、%sからERRORです(21時基準)".format(planetName,
         TimeLib.monthString(time, nextDay1, nextDay1));
     } else {
-      "%sが次に夜見えやすくなるのは%sです(21時基準)".format(planetName,
+      "%sが次に夜見えやすくなるのは、%sです(21時基準)".format(planetName,
         TimeLib.monthString(time, nextDay1, nextDay2));
     }
   }
@@ -2762,7 +2764,7 @@ tweetMoonRiseSet();
       if (MathLib.circleAdd(sid, -starsB(index)._1) >= 0) {
         val msg = starsB(index)._2;
         {
-          val p = (day1 until (day2 + 7)).indexWhere { d =>
+          val p = (day1 until (day2 + 14)).indexWhere { d =>
             getTweets(startTime + d).daytimeTweets.isEmpty;
           }
           day1 = if (p < 0) day1 else day1 + p;
@@ -2783,12 +2785,19 @@ tweetMoonRiseSet();
 // なにもツイートのない日付
 
 {
+  var daytimeEmptyCount: Int = 0;
   (0 until period).foreach { day =>
     val time = startTime + day;
+    if (getTweets(time).daytimeTweets.isEmpty) {
+      val date = TimeLib.modifiedJulianDayToStringJSTDate(time + 12.0 / 24);
+      //System.err.println("%s #empty".format(date));
+      daytimeEmptyCount += 1;
+    }
     if (getTweets(time).isEmpty) {
       putTweet(time, "#empty");
     }
   }
+  System.err.println("daytimeEmptyCount: %d".format(daytimeEmptyCount));
 }
 
 //==============================================================================
