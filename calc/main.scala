@@ -1852,7 +1852,8 @@ val manualTweet = """
 2021-04-09T12:00 準惑星マケマケが衝
 2021-10-22T12:00 準惑星エリスが衝
 
-2021-04-10T12:00 マケマケは、冥王星型天体の準惑星です。準惑星の認定は、ケレス、冥王星、エリスに次いで4つ目です。冥王星、エリスより小さく、ハウメアと同程度の大きさです。公転周期は、海王星の倍近くの307年です。かみのけ座にいます
+2021-04-10T12:00 マケマケは、冥王星型天体の準惑星です。準惑星は他にケレス、冥王星、エリス、ハウメアがあります。冥王星、エリスより小さく、ハウメアと同程度の大きさです。公転周期は、海王星の倍近くの306年です。かみのけ座にいます
+2021-04-29T12:00 ハウメアは、冥王星型天体の準惑星です。準惑星は他にケレス、冥王星、エリス、マケマケがあります。冥王星、エリスより小さく、マケマケと同程度の大きさです。公転周期は283年です。うしかい座にいます
 """;
 
 manualTweet.split("\n").foreach { line =>
@@ -2850,6 +2851,8 @@ tweetMoonRiseSet();
       val msg = tc.message + tc.hashtags.map(" #" + _).mkString;
       if (msg.indexOf("ERROR") >= 0) {
         println("%s #%s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
+      } else if (msg.length > 140) {
+        println("%s #TOO_LONG %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
       } else {
         println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
       }
