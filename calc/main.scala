@@ -1981,7 +1981,37 @@ def putTweet(time: Double, msg: String): Unit = {
         MoonPhaseTermTweetContent(time, 4, 0, calcMoonConstellation(time));
       }
     }.foreach(putTweet);
+
+    val midAltData = (0 until fullMoons.size).flatMap { i =>
+      val time = fullMoons(i);
+      val p1 = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._2 - time);
+      if (p1 >= 1) {
+        val p2 = if (moonRiseSetTimesData(p1 - 1)._2 + moonRiseSetTimesData(p1)._2 < 2 * time) {
+          p1;
+        } else {
+          p1 - 1;
+        }
+        Some((moonRiseSetTimesData(p2)._2, moonRiseSetTimesData(p2)._4));
+      } else {
+        None;
+      }
+    }
+    (0 until midAltData.size).foreach { i =>
+      val (time, alt) = midAltData(i);
+      if (i > 0 && i < midAltData.size - 1) {
+        if (midAltData(i - 1)._2 <= alt && midAltData(i + 1)._2 < alt) {
+          putTweet(time, "満月が南中(高度%.0f°)。冬の満月は空高く上り、今日はこの冬でもっとも天頂に近いです".format(alt * PI57));
+        } else if (midAltData(i - 1)._2 >= alt && midAltData(i + 1)._2 > alt) {
+          putTweet(time, "満月が南中(高度%.0f°)。夏の満月は空低く、今日はこの夏でもっとも低いです".format(alt * PI57));
+        } else {
+          putTweet(time, "満月が南中(高度%.0f°)".format(alt * PI57));
+        }
+      } else {
+        putTweet(time, "満月が南中(高度%.0f°)".format(alt * PI57));
+      }
+    }
   }
+
   moonPhaseTerms.filter(_._2 != 4).map { case (time, term) =>
     MoonPhaseTermTweetContent(time, term, 0, calcMoonConstellation(time));
   }.foreach(putTweet);
