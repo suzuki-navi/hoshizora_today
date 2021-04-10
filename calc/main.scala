@@ -9,6 +9,7 @@ val jplDataPath = "../var/ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.
 val nutLsDataPath = "nut-ls.txt";
 val nutPlDataPath = "nut-pl.txt";
 val constellationsDataPath = "constellations.txt";
+val holidayDataPath = "holiday.txt";
 
 val PI = Math.PI;
 val PI2 = Math.PI * 2.0;
@@ -1833,36 +1834,31 @@ def putTweet(time: Double, msg: String): Unit = {
 }
 
 //==============================================================================
-// 12時にツイートする日付単位で発生する天文の現象
+// 祝日・記念日
 //==============================================================================
 
-// PERIOD
-
-val manualTweet = """
-2021-11-05T12:00 天王星が衝
-2021-09-15T12:00 海王星が衝
-2021-07-18T12:00 冥王星が衝
-
-2021-11-28T12:00 準惑星ケレスが衝
-2021-09-09T12:00 小惑星パラスが衝
-2021-06-08T12:00 小惑星ジュノーが衝
-2021-03-08T12:00 小惑星ベスタが衝
-
-2021-10-22T12:00 準惑星エリスが衝
-2021-04-09T12:00 準惑星マケマケが衝
-2021-04-28T12:00 準惑星ハウメアが衝
-
-2021-04-10T12:00 マケマケは、冥王星型天体の準惑星です。準惑星は他にケレス、冥王星、エリス、ハウメアがあります。冥王星、エリスより小さく、ハウメアと同程度の大きさです。公転周期は、海王星の倍近くの306年です。かみのけ座にいます
-2021-04-29T12:00 ハウメアは、冥王星型天体の準惑星です。準惑星は他にケレス、冥王星、エリス、マケマケがあります。冥王星、エリスより小さく、マケマケと同程度の大きさです。公転周期は283年です。うしかい座にいます
-""";
-
-manualTweet.split("\n").foreach { line =>
-  val cols = line.split(" ", 2);
-  if (cols.length == 2) {
-    val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
-    val msg = cols(1);
-     putTweet(time, msg);
+{
+  val yearStart = TimeLib.modifiedJulianDayToStringJST(startTime).substring(0, 4).toInt;
+  val yearEnd = TimeLib.modifiedJulianDayToStringJST(endTime).substring(0, 4).toInt;
+  val source = scala.io.Source.fromFile(holidayDataPath);
+  source.getLines.foreach { line =>
+    if (line != "" && !line.startsWith("#")) {
+      val cols = line.split(" ", 2);
+      if (cols(0).startsWith("YYYY-")) {
+        val msg = cols(1);
+        (yearStart to yearEnd).foreach { year =>
+          val timeStr = year.toString + cols(0).substring(4);
+          val time = TimeLib.stringToModifiedJulianDay(timeStr + ":00+09:00");
+          putTweet(time, msg);
+        }
+      } else {
+        val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
+        val msg = cols(1);
+        putTweet(time, msg);
+      }
+    }
   }
+  source.close();
 }
 
 //==============================================================================
