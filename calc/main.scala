@@ -2336,9 +2336,9 @@ case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends On
       "。" + s + "です";
     }
   }
-  def message: String = "月(月相%.1f/28)は日没時に西の空高度約%d°%s".format(moonPhase, alt360, moonStr);
-  def message2: String = "月(月相%.1f/28)は日没時に西の空高度約%d°にいます%s".format(moonPhase, alt360, moonStr);
-  def message3: String = "月(月相%.1f/28)は約%d°にいます%s".format(moonPhase, alt360, moonStr);
+  def message: String = "月は日没時に西の空高度約%d°%s".format(alt360, moonStr);
+  def message2: String = "月は日没時に西の空高度約%d°にいます%s".format(alt360, moonStr);
+  def message3: String = "月は約%d°にいます%s".format(alt360, moonStr);
   def hashtags: List[String] = Nil;
   def starNames: List[String] = List("月");
 }
