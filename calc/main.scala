@@ -10,6 +10,7 @@ val nutLsDataPath = "nut-ls.txt";
 val nutPlDataPath = "nut-pl.txt";
 val constellationsDataPath = "constellations.txt";
 val holidayDataPath = "holiday.txt";
+val meteorDataPath = "meteor.txt";
 
 val PI = Math.PI;
 val PI2 = Math.PI * 2.0;
@@ -511,6 +512,10 @@ object Bpn {
     r = VectorLib.rotateMatrixY( 17.3 / 1000 / 3600 / PI57, r);
     r = VectorLib.rotateMatrixZ(-78.0 / 1000 / 3600 / PI57, r);
     r;
+  }
+
+  val icrsToMeanEclipticMatrix2000: Array[Double] = {
+    icrsToMeanEclipticMatrix(TimeLib.stringToModifiedJulianDay("2000-01-01T00:00:00+00:00"));
   }
 
   // ICRS座標系から平均黄道座標系に変換
@@ -1606,6 +1611,47 @@ def touchMoonRiseSetStr(time0: Double): Option[String] = {
   }
 }
 
+def moonRiseSetForMeteorShower(time0: Double): String = {
+  val sopt = touchMoonRiseSetStr(time0);
+  if (sopt.isDefined) {
+    return sopt.get;
+  }
+  def isNextDay(time: Double): Boolean = {
+    (time0 + 9.0 / 24).toInt < (time + 9.0 / 24).toInt;
+  }
+  def timeStr0(time: Double): String = {
+    val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
+    "%s時%s分".format(str.substring(11, 13), str.substring(14, 16));
+  }
+  val p1 = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._1 - time0);
+  val p2 = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._3 - time0);
+  val moonRiseTime = moonRiseSetTimesData(p1)._1;
+  val moonSetTime = moonRiseSetTimesData(p2)._3;
+  if (moonRiseTime < moonSetTime) {
+    if (isNextDay(moonRiseTime)) {
+      "翌日の月の出は%sごろ、月の入りは%sごろ".format(
+        timeStr0(moonRiseTime), timeStr0(moonSetTime));
+    } else if (isNextDay(moonSetTime)) {
+      "月の出は%sごろ、月の入りは翌日の%sごろ".format(
+        timeStr0(moonRiseTime), timeStr0(moonSetTime));
+    } else {
+      "月の出は%sごろ、月の入りは%sごろ".format(
+        timeStr0(moonRiseTime), timeStr0(moonSetTime));
+    }
+  } else {
+    if (isNextDay(moonSetTime)) {
+      "翌日の月の入りは%sごろ、月の出は%sごろ".format(
+        timeStr0(moonSetTime), timeStr0(moonRiseTime));
+    } else if (isNextDay(moonRiseTime)) {
+      "月の入りは%sごろ、月の出は翌日の%sごろ".format(
+        timeStr0(moonSetTime), timeStr0(moonRiseTime));
+    } else {
+      "月の入りは%sごろ、月の出は%sごろ".format(
+        timeStr0(moonSetTime), timeStr0(moonRiseTime));
+    }
+  }
+}
+
 def tweetMoonRiseSet(): Unit = {
   (0 until moonRiseSetTimesData.size).foreach { p =>
     if (!moonRiseSetTimesDataTouch(p)) {
@@ -1866,19 +1912,32 @@ def putTweet(time: Double, msg: String): Unit = {
 // 特定の時間に発生する天文の現象
 //==============================================================================
 
+def calcSunLng(time: Double): Double = {
+  val utc = time;
+  val tdb = TimeLib.mjdutcToTdb(utc);
+  val sun = jplData.calcSunFromEarth(tdb);
+  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+  val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
+  val sunLng = VectorLib.xyzToLng(sun2);
+  sunLng;
+}
+def calcSunLng2(time: Double): Double = {
+  val utc = time;
+  val tdb = TimeLib.mjdutcToTdb(utc);
+  val sun = jplData.calcSunFromEarth(tdb);
+  val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
+  val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
+  val sunLng = VectorLib.xyzToLng(sun2);
+  sunLng;
+}
+
 //--------------------------------------
 // 24節気
 //--------------------------------------
 
 {
   val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, startTime, endTime, 3.0, 24) { time =>
-    val utc = time;
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
-    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
-    val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-    val sunLng = VectorLib.xyzToLng(sun2);
-    sunLng;
+    calcSunLng(time);
   }
   val termStrs = IndexedSeq(
     "春分", "清明", "穀雨", "立夏", "小満", "芒種", "夏至", "小暑", "大暑", "立秋", "処暑", "白露",
@@ -1890,6 +1949,62 @@ def putTweet(time: Double, msg: String): Unit = {
     } else {
       putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "二十四節気の%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
     }
+  }
+}
+
+{
+  val meteorShowerData: (IndexedSeq[(Double, String)], IndexedSeq[(Double, String)]) = {
+    import Ordering.Double.IeeeOrdering;
+    var data1: List[(Double, String)] = Nil;
+    var data2: List[(Double, String)] = Nil;
+    val source = scala.io.Source.fromFile(meteorDataPath);
+    source.getLines.foreach { line =>
+      if (line != "" && !line.startsWith("#")) {
+        val cols = line.split(" ", 2);
+        if (cols(0).indexOf("T") == 10) {
+          val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
+          data2 = (time, cols(1)) :: data2;
+        } else {
+          val lng = cols(0).toDouble / PI57;
+          data1 = (lng, cols(1)) :: data1;
+        }
+      }
+    }
+    source.close();
+    (data1.reverse.sortBy(_._1).toIndexedSeq, data2.reverse.toIndexedSeq);
+  }
+
+  var day: Int = 0;
+  var index: Int = {
+    val time = startTime + day + 0.5;
+    val lng = calcSunLng2(time);
+    val index = meteorShowerData._1.indexWhere(_._1 > lng);
+    if (index < 0) {
+      0;
+    } else {
+      index;
+    }
+  }
+  while (day < period) {
+    val time = startTime + day + 0.5;
+    val lng = calcSunLng2(time);
+    val d = MathLib.circleAdd(lng, -meteorShowerData._1(index)._1);
+    if (d >= 0) {
+      val time1 = time - 1.0 + 20.0 / 60 / 24;
+      val name = meteorShowerData._1(index)._2;
+      val msg = "%sは今夜が極大。%s".format(name, moonRiseSetForMeteorShower(time1));
+      putTweet(time1, msg);
+      index += 1;
+      if (index == meteorShowerData._1.size) {
+        index = 0;
+      }
+    } else {
+      day += 1;
+    }
+  }
+
+  meteorShowerData._2.foreach { case (time, msg) =>
+    putTweet(time, msg);
   }
 }
 
