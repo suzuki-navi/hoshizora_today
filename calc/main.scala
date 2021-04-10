@@ -1540,21 +1540,40 @@ def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Arra
   (xyz, azialt._1, azialt._2);
 }
 
-val moonRiseSetTimesData: IndexedSeq[(Double, Int)] = { // 0: 月出, 2: 月没
-  //val altHor = -0.90 / PI57;
-  val altHor = +0.4 / PI57; // だいたい
-  MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 0.25, 24 * 6) { time =>
-    calcPlanetXyzAziAlt(time, JplData.Moon)._3 - altHor;
+def calcRiseSetCulmination(targetPlanet: JplData.TargetPlanet, altHor: Double):
+  IndexedSeq[(Double, Double, Double, Double)] = { // 出, 南中, 没, 南中高度
+  val riseSet = MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 0.25, 24 * 6) { time =>
+    calcPlanetXyzAziAlt(time, targetPlanet)._3 - altHor;
   }.filter(_._2 % 2 == 0);
+  var result: List[(Double, Double, Double, Double)] = Nil;
+  (0 until (riseSet.size - 1)).foreach { i =>
+    val (time0, flag0) = riseSet(i);
+    if (flag0 == 0) {
+      val (time2, flag2) = riseSet(i + 1);
+      val time1 = Lib2.findCrossingBoundaryTime(0.0, false, false,
+        time0, 24 * 6, ((time2 - time0) * 24 * 6).toInt) { time =>
+        calcPlanetXyzAziAlt(time, JplData.Moon)._2 - PI;
+      }
+      val xyz = calcPlanetXyzAziAlt(time1, targetPlanet)._1;
+      val x = xyz(0);
+      val y = xyz(1);
+      val z = xyz(2);
+      val xy = Math.sqrt(x * x + y * y);
+      val altm = Math.atan2(z, xy);
+      val alt = altm + PI5 - tokyoLat;
+      result = (time0, time1, time2, alt) :: result;
+    }
+  }
+  result.reverse.toIndexedSeq;
+}
+
+val moonRiseSetTimesData: IndexedSeq[(Double, Double, Double, Double)] = {
+  val altHor = +0.4 / PI57; // だいたい
+  calcRiseSetCulmination(JplData.Moon, altHor);
 }
 val moonRiseSetTimesDataTouch: Array[Boolean] = new Array[Boolean](moonRiseSetTimesData.size);
 
-//def calcMoonRiseSet(time0: Double): ((Double, Int), (Double, Int)) = {
-//  val p = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._1 - time0);
-//  (moonRiseSetTimesData(p), moonRiseSetTimesData(p + 1))
-//}
-
-def touchMoonRiseSetStr(time0: Double): String = {
+def touchMoonRiseSetStr(time0: Double): Option[String] = {
   val p = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._1 - time0);
   def isNextDay(time: Double): Boolean = {
     (time0 + 9.0 / 24).toInt < (time + 9.0 / 24).toInt;
@@ -1563,66 +1582,48 @@ def touchMoonRiseSetStr(time0: Double): String = {
     val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
     "%s時%s分".format(str.substring(11, 13), str.substring(14, 16));
   }
-  def timeStr(time: Double): String = {
-    (if (isNextDay(time)) {
-      "翌日";
-    } else {
-      "";
-    }) + timeStr0(time);
-  }
-  if (p < 0 || p >= moonRiseSetTimesData.size - 1) {
-    "ERROR";
+  if (p < 0 || p >= moonRiseSetTimesData.size) {
+    Some("ERROR");
+  } else if (moonRiseSetTimesData(p)._1 - time0 > 8.0 / 24) {
+    None;
   } else {
     moonRiseSetTimesDataTouch(p) = true;
-    moonRiseSetTimesDataTouch(p + 1) = true;
-    val moonPhase1 = calcMoonPhase(moonRiseSetTimesData(p)._1);
-    val moonPhase2 = calcMoonPhase(moonRiseSetTimesData(p + 1)._1);
-    if (moonRiseSetTimesData(p)._2 == 0) {
-      if (isNextDay(moonRiseSetTimesData(p)._1)) {
-        "翌日の月の出は%sごろ(月相 %.1f/28)で、月の入りは%sごろ(月相 %.1f/28)".format(
-          timeStr0(moonRiseSetTimesData(p)._1), moonPhase1, timeStr0(moonRiseSetTimesData(p + 1)._1), moonPhase2);
-      } else if (isNextDay(moonRiseSetTimesData(p + 1)._1)) {
-        "月の出は%sごろ(月相 %.1f/28)で、月の入りは翌日%sごろ(月相 %.1f/28)".format(
-          timeStr0(moonRiseSetTimesData(p)._1), moonPhase1, timeStr0(moonRiseSetTimesData(p + 1)._1), moonPhase2);
-      } else {
-        "月の出は%sごろ(月相 %.1f/28)で、月の入りは%sごろ(月相 %.1f/28)".format(
-          timeStr0(moonRiseSetTimesData(p)._1), moonPhase1, timeStr0(moonRiseSetTimesData(p + 1)._1), moonPhase2);
-      }
+    val data = moonRiseSetTimesData(p);
+    val moonPhase = calcMoonPhase(data._2);
+    Some(if (isNextDay(data._1)) {
+      "翌日の月の出は%sごろ、南中は%sごろ(月相%.1f/28)、月の入りは%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
+    } else if (isNextDay(data._2)) {
+      "月の出は%sごろ、南中は翌日%sごろ(月相%.1f/28)、月の入りは翌日%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
+    } else if (isNextDay(data._3)) {
+      "月の出は%sごろ、南中は%sごろ(月相%.1f/28)、月の入りは翌日%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
     } else {
-      if (isNextDay(moonRiseSetTimesData(p)._1)) {
-        "翌日の月の入りは%sごろ(月相 %.1f/28)で、月の出は%sごろ(月相 %.1f/28)".format(
-          timeStr0(moonRiseSetTimesData(p)._1), moonPhase1, timeStr0(moonRiseSetTimesData(p + 1)._1), moonPhase2);
-      } else if (isNextDay(moonRiseSetTimesData(p + 1)._1)) {
-        "月の入りは%sごろ(月相 %.1f/28)で、月の出は翌日%sごろ(月相 %.1f/28)".format(
-          timeStr0(moonRiseSetTimesData(p)._1), moonPhase1, timeStr0(moonRiseSetTimesData(p + 1)._1), moonPhase2);
-      } else {
-        "月の入りは%sごろ(月相 %.1f/28)で、月の出は%sごろ(月相 %.1f/28)".format(
-          timeStr0(moonRiseSetTimesData(p)._1), moonPhase1, timeStr0(moonRiseSetTimesData(p + 1)._1), moonPhase2);
-      }
-    }
+      "月の出は%sごろ、南中は%sごろ(月相%.1f/28)、月の入りは%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
+    });
   }
 }
 
 def tweetMoonRiseSet(): Unit = {
-  (0 until (moonRiseSetTimesData.size - 1)).foreach { p =>
-    if (moonRiseSetTimesData(p)._2 == 0) { // 月の出
-      if (!moonRiseSetTimesDataTouch(p) || !moonRiseSetTimesDataTouch(p + 1)) {
-        val time = moonRiseSetTimesData(p)._1;
-        val time2 = {
-          val d = time - time.toInt;
-          if (d < 7.0 / 24) { // 9時～16時
-            time;
-          } else if (d < 15.0 / 24) { // 16時～24時
-            time - d + 7.0 / 24; // 16時
-          } else if (d < 21.0 / 24) { // 0時～6時
-            time - d + 14.5 / 24; // 23時30分
-          } else { // 6時～9時
-            time;
-          }
+  (0 until moonRiseSetTimesData.size).foreach { p =>
+    if (!moonRiseSetTimesDataTouch(p)) {
+      val time = moonRiseSetTimesData(p)._1;
+      val time2 = {
+        val d = time - time.toInt;
+        if (d < 7.0 / 24) { // 9時～16時
+          time;
+        } else if (d < 15.0 / 24) { // 16時～24時
+          time - d + 7.0 / 24; // 16時
+        } else if (d < 21.0 / 24) { // 0時～6時
+          time - d + 14.5 / 24; // 23時30分
+        } else { // 6時～9時
+          time;
         }
-        val riseset = touchMoonRiseSetStr(time2);
-        putTweet(time2, riseset);
       }
+      val riseset = touchMoonRiseSetStr(time2).get;
+      putTweet(time2, riseset);
     }
   }
 }
@@ -1898,19 +1899,27 @@ def putTweet(time: Double, msg: String): Unit = {
 
 {
   case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, distanceFlag: Int,
-    cons: Option[(String, String, List[String])], riseset: String) extends TweetContent {
+    cons: Option[(String, String, List[String])]) extends TweetContent {
+
+    private[this] val riseset: String = {
+      touchMoonRiseSetStr(rawTime) match {
+        case None => "";
+        case Some(s) => "。" + s;
+      }
+    }
+
     def time: Double = TimeLib.floor(rawTime, 24) + 1.0 / (24 * 4);
     def message: String = {
       val msg = if (term == 4 && distanceFlag < 0) {
-        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です。スーパームーンとも呼ばれます。月相 14/28";
+        "満月\uD83C\uDF15。月が地球に近く、もっとも大きい満月です。スーパームーンとも呼ばれます。月相14/28";
       } else if (term == 4 && distanceFlag > 0) {
-        "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です。月相 14/28";
+        "満月\uD83C\uDF15。月が地球から遠く、もっとも小さい満月です。月相14/28";
       } else {
         termStrs(term);
       }
       cons match {
-        case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます。%s".format(conscomment, msg, cons, riseset);
-        case None => "%s。%s".format(msg, riseset);
+        case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます%s".format(conscomment, msg, cons, riseset);
+        case None => "%s%s".format(msg, riseset);
       }
     }
     def hashtags: List[String] = {
@@ -1920,15 +1929,16 @@ def putTweet(time: Double, msg: String): Unit = {
       }
     }
     def starNames: List[String] = List("月");
+
     private[this] val termStrs = IndexedSeq(
-      "新月\uD83C\uDF11。月相 0/28",
-      "月相 3.5/28。新月と上弦の中間です\uD83C\uDF12",
-      "上弦の月\uD83C\uDF13。月相 7/28",
-      "月相 10.5/28。上弦と満月の中間です\uD83C\uDF14",
-      "満月\uD83C\uDF15。月相 14/28",
-      "月相 17.5/28。満月と下弦の中間です\uD83C\uDF16",
-      "下弦の月\uD83C\uDF17。月相 21/28",
-      "月相 24.5/28。下弦と新月の中間です\uD83C\uDF18",
+      "新月\uD83C\uDF11。月相0/28",
+      "月相3.5/28。新月と上弦の中間です\uD83C\uDF12",
+      "上弦の月\uD83C\uDF13。月相7/28",
+      "月相10.5/28。上弦と満月の中間です\uD83C\uDF14",
+      "満月\uD83C\uDF15。月相14/28",
+      "月相17.5/28。満月と下弦の中間です\uD83C\uDF16",
+      "下弦の月\uD83C\uDF17。月相21/28",
+      "月相24.5/28。下弦と新月の中間です\uD83C\uDF18",
     );
   }
 
@@ -1963,19 +1973,17 @@ def putTweet(time: Double, msg: String): Unit = {
     }
     fullMoonsDistanceMaxMinUpDownFlags.zipWithIndex.map { case (flag, idx) =>
       val time = fullMoons(idx);
-      val riseset = touchMoonRiseSetStr(time);
       if (flag == 1) {
-        MoonPhaseTermTweetContent(time, 4, +1, calcMoonConstellation(time), riseset);
+        MoonPhaseTermTweetContent(time, 4, +1, calcMoonConstellation(time));
       } else if (flag == 3) {
-        MoonPhaseTermTweetContent(time, 4, -1, calcMoonConstellation(time), riseset);
+        MoonPhaseTermTweetContent(time, 4, -1, calcMoonConstellation(time));
       } else {
-        MoonPhaseTermTweetContent(time, 4, 0, calcMoonConstellation(time), riseset);
+        MoonPhaseTermTweetContent(time, 4, 0, calcMoonConstellation(time));
       }
     }.foreach(putTweet);
   }
   moonPhaseTerms.filter(_._2 != 4).map { case (time, term) =>
-    val riseset = touchMoonRiseSetStr(time);
-    MoonPhaseTermTweetContent(time, term, 0, calcMoonConstellation(time), riseset);
+    MoonPhaseTermTweetContent(time, term, 0, calcMoonConstellation(time));
   }.foreach(putTweet);
 }
 
@@ -2183,9 +2191,9 @@ case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends On
       "。" + s + "です";
     }
   }
-  def message: String = "月(月相 %.1f/28)、日没時に西の空高度約%d°%s".format(moonPhase, alt360, moonStr);
-  def message2: String = "月(月相 %.1f/28)、日没時に西の空高度約%d°にいます%s".format(moonPhase, alt360, moonStr);
-  def message3: String = "月(月相 %.1f/28)、約%d°にいます%s".format(moonPhase, alt360, moonStr);
+  def message: String = "月(月相%.1f/28)は日没時に西の空高度約%d°%s".format(moonPhase, alt360, moonStr);
+  def message2: String = "月(月相%.1f/28)は日没時に西の空高度約%d°にいます%s".format(moonPhase, alt360, moonStr);
+  def message3: String = "月(月相%.1f/28)は約%d°にいます%s".format(moonPhase, alt360, moonStr);
   def hashtags: List[String] = Nil;
   def starNames: List[String] = List("月");
 }
@@ -2432,7 +2440,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   }
   def moonPhaseStr: String = {
     if (fastStarName == "月") {
-      "。月相 %.1f/28".format(calcMoonPhase(time));
+      "。月相%.1f/28".format(calcMoonPhase(time));
     } else {
       "";
     }
@@ -2608,7 +2616,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
               "。" + s + "です";
             }
           }
-          putTweet(time, "%s月は%sにいます。月相 %.1f/28%s".format(conscomment, cons, moonPhase, moonStr) +
+          putTweet(time, "%s月は%sにいます。月相%.1f/28%s".format(conscomment, cons, moonPhase, moonStr) +
             hashtags.map(" #" + _).mkString);
       }
     }
