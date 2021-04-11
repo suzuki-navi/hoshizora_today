@@ -845,6 +845,28 @@ object Hcs {
     }
   }
 
+  def aziAltToNaturalStringC(azi: Double, alt: Double): (String, Double) = {
+    val alt360 = alt * PI57;
+    if (alt360 >= 80) {
+      ("天頂", 0.0);
+    } else if (alt360 < 30) {
+      ("", 0.0);
+    } else {
+      val azi360 = azi * PI57;
+      if (azi360 <= 45) {
+        ("北の空", -alt);
+      } else if (azi360 >= 315) {
+        ("北の空", -alt);
+      } else if (azi360 <= 135) {
+        ("東の空", -alt);
+      } else if (azi360 >= 225) {
+        ("西の空", -alt);
+      } else {
+        ("南の空", -alt);
+      }
+    }
+  }
+
 }
 
 object Constellations {
@@ -2862,35 +2884,63 @@ tweetMoonRiseSet();
     def hashtags: List[String] = hashtags2 ::: "星空" :: "星座" :: Nil;
     def starNames: List[String] = Nil;
   }
-  val (starsA, starsB) = {
+  val (starsA, starsB, starsC, starsE) = {
     val source = scala.io.Source.fromFile(constellationsDataPath);
-    var stars: List[(Double, String, List[String], String)] = Nil;
+    var starsA: List[(Double, String, List[String])] = Nil;
+    var starsB: List[(Double, String, List[String])] = Nil;
+    var starsC: List[(Double, Array[Double], String, List[String])] = Nil;
+    var starsE: List[(Double, Array[Double], String, List[String])] = Nil;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val t1 = line.substring(0, 6);
-        var content0 = line.substring(7).trim;
-        var hashtags: List[String] = Nil;
-        var p: Int = content0.lastIndexOf("#");
-        while (p >= 0) {
-          hashtags = content0.substring(p + 1).trim :: hashtags;
-          content0 = content0.substring(0, p).trim;
-          p = content0.lastIndexOf("#");
+        val (content0: String, hashtags: List[String]) = {
+          var content0 = line.substring(7).trim;
+          var hashtags: List[String] = Nil;
+          var p: Int = content0.lastIndexOf("#");
+          while (p >= 0) {
+            hashtags = content0.substring(p + 1).trim :: hashtags;
+            content0 = content0.substring(0, p).trim;
+            p = content0.lastIndexOf("#");
+          }
+          (content0, hashtags.reverse);
         }
         val ra = (t1.substring(0, 2).toInt.toDouble + t1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
-        val content = if (content0.startsWith("A ")) {
-          (content0.substring(2), "A");
-        } else if (content0.startsWith("B ")) {
-          (content0.substring(2), "B");
+        if (content0.matches("[CDE] [-+.0-9]+ .+")) {
+          val p = content0.indexOf(" ", 2);
+          val dec = content0.substring(2, p).toDouble / PI57;
+          val content = content0.substring(p + 1);
+          val z = Math.sin(dec);
+          val xy = Math.cos(dec);
+          val x = xy * Math.cos(ra);
+          val y = xy * Math.sin(ra);
+          val xyz = Array(x, y, z);
+          if (content0.startsWith("C ")) {
+            starsC = (ra, xyz, content, hashtags) :: starsC;
+          } else if (content0.startsWith("E ")) {
+            starsC = (ra, xyz, content, hashtags) :: starsC;
+            starsE = (ra, xyz, content, hashtags) :: starsE;
+          }
         } else {
-          (content0, "A");
+          if (content0.startsWith("A ")) {
+            val content = content0.substring(2);
+            starsA = (ra, content, hashtags) :: starsA;
+          } else if (content0.startsWith("B ")) {
+            val content = content0.substring(2);
+            starsB = (ra, content, hashtags) :: starsB;
+          } else {
+            val content = content0;
+            starsA = (ra, content, hashtags) :: starsA;
+          }
         }
-        stars = (ra, content._1, hashtags.reverse, content._2) :: stars;
       }
     }
     source.close();
-    val starsA = stars.filter(_._4 == "A").reverse.toIndexedSeq.sortBy(_._1).map(t => (t._1, t._2, t._3));
-    val starsB = stars.filter(_._4 == "B").reverse.toIndexedSeq.sortBy(_._1).map(t => (t._1, t._2, t._3));
-    (starsA, starsB);
+    (
+      starsA.reverse.toIndexedSeq.sortBy(_._1),
+      starsB.reverse.toIndexedSeq.sortBy(_._1),
+      starsC.reverse.toIndexedSeq.sortBy(_._1),
+      starsE.reverse.toIndexedSeq.sortBy(_._1),
+    );
   }
 
   val altHor = -0.90 / PI57;
@@ -2967,6 +3017,81 @@ tweetMoonRiseSet();
       }
       day1 += 1;
       day2 += 1;
+    }
+  }
+
+/*
+  {
+    var day: Int = 0;
+    while (day < period) {
+      val time = startTime + day + 21.0 / 24;
+      if (TimeLib.modifiedJulianDayToStringJST(time).substring(8, 10) == "01") {
+      //if (getTweets(time).daytimeTweets.isEmpty) {
+      //if (true) {
+        val utc = time;
+        val ut1 = utc; // 近似的
+        val tdb = TimeLib.mjdutcToTdb(utc);
+        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+        val constellations = starsC.flatMap { case (ra, xyz, name, hashtags) =>
+          val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+          val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+          val (aziAltStr, sort) = Hcs.aziAltToNaturalStringC(azi, alt);
+          if (aziAltStr == "") {
+            None;
+          } else {
+            Some((aziAltStr, sort, name));
+          }
+        }
+        def makeConstellationsString(categ: String): Option[String] = {
+          val cs = constellations.filter(_._1 == categ).sortBy(_._2).map(_._3);
+          if (cs.isEmpty) {
+            None;
+          } else {
+            Some("(%s)%s".format(categ, cs.mkString("、")));
+          }
+        }
+        val constellationsStr = List("天頂", "西の空", "南の空", "東の空", "北の空").
+          flatMap(makeConstellationsString).mkString("、");
+        val msg = "DEBUG この時期21時ごろ見えやすい星座は、%sです".format(constellationsStr);
+        //putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+      }
+      day += 1;
+    }
+  }
+*/
+
+  {
+    val altThres = 20.0 / PI57;
+    var day: Int = 0;
+    while (day < period) {
+      val time = startTime + day + 21.0 / 24;
+      //if (TimeLib.modifiedJulianDayToStringJST(time).substring(8, 10) == "01") {
+      //if (getTweets(time).daytimeTweets.isEmpty) {
+      if (time.toInt % 14 == 11) {
+        val utc = time;
+        val ut1 = utc; // 近似的
+        val tdb = TimeLib.mjdutcToTdb(utc);
+        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+        val constellations = starsE.flatMap { case (ra, xyz, name, hashtags) =>
+          val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+          val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
+          if (alt >= altThres) {
+            val aziAltStr = Hcs.aziAltToNaturalString(azi, alt);
+            Some((aziAltStr, azi, name));
+          } else {
+            None;
+          }
+        }
+        val constellationsStr = constellations.sortBy(-_._2).map { case (aziAltStr, azi, name) =>
+          "%s(%s)".format(name, aziAltStr);
+          //name;
+        }.mkString("、");
+        val msg = "この時期21時ごろ見える黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
+        putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+        day += 14;
+      } else {
+        day += 1;
+      }
     }
   }
 }
