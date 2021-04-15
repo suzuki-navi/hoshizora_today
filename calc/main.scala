@@ -2898,7 +2898,7 @@ tweetMoonRiseSet();
     var starsD: List[(Double, Array[Double], String, List[String])] = Nil;
     var starsE: List[(Double, Array[Double], String, List[String])] = Nil;
     var starsG: List[(Double, Array[Double], String, List[String])] = Nil;
-    val galaxy = List("さそり座", "いて座", "わし座", "はくちょう座", "カシオペア座", "ペルセウス座", "ぎょしゃ座", "ふたご座", "いっかくじゅう座", "おおいぬ座", "とも座");
+    val galaxy = List("さそり座", "いて座", "わし座", "はくちょう座", "カシオペア座", "ペルセウス座", "ぎょしゃ座", "ふたご座", "いっかくじゅう座", "とも座");
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val t1 = line.substring(0, 6);
@@ -3082,14 +3082,17 @@ tweetMoonRiseSet();
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
       if (alt >= altThres) {
-        Some((ra, name));
+        val sid = hcs.siderealTime(ut1);
+        val ra2 = ra - sid;
+        val ra3 = if (ra2 < -PI) ra2 + PI2 else if (ra2 >= PI) ra2 - PI2 else ra2;
+        Some((ra3, name));
       } else {
         None;
       }
     }
     if (constellations.nonEmpty) {
       val constellationsStr = constellations.sortBy(_._1).map(_._2).mkString("、");
-      val msg = "# この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
+      val msg = "この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
       putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
     }
   }
