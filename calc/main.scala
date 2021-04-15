@@ -2979,7 +2979,7 @@ tweetMoonRiseSet();
       }
     }
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
-    val msg = "この時期21時ごろ見えやすい星座は、%sです".format(constellationsStr);
+    val msg = "この時期21時ごろ見えやすい星座は、%sです #星空 #星座".format(constellationsStr);
     putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
   }
 
@@ -3006,7 +3006,7 @@ tweetMoonRiseSet();
     }
     if (constellations.nonEmpty) {
       val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
-      val msg = "# この時期21時ごろ見える南の空低い星座は、%sです".format(constellationsStr);
+      val msg = "この時期21時ごろ南の低い空に見える星座は、%sです #星空 #星座".format(constellationsStr);
       putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
     }
   }
@@ -3039,7 +3039,7 @@ tweetMoonRiseSet();
       }
     }).toIndexedSeq;
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
-    val msg = "この時期21時ごろ見える明るい星は、%sです #星空 #星座".format(constellationsStr);
+    val msg = "この時期21時ごろ見える明るい星は、%sです #星空".format(constellationsStr);
     putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
   }
 
@@ -3061,11 +3061,13 @@ tweetMoonRiseSet();
         None;
       }
     }
-    val constellationsStr = constellations.sortBy(-_._2).map { case (aziAltStr, azi, name) =>
-      "%s(%s)".format(name, aziAltStr);
-    }.mkString("、");
-    val msg = "この時期21時ごろ見えやすい黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
-    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+    if (constellations.nonEmpty) {
+      val constellationsStr = constellations.sortBy(-_._2).map { case (aziAltStr, azi, name) =>
+        "%s(%s)".format(name, aziAltStr);
+      }.mkString("、");
+      val msg = "この時期21時ごろ見えやすい黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
+      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+    }
   }
 
   // この時期21時ごろ見える天の川
@@ -3087,7 +3089,7 @@ tweetMoonRiseSet();
     }
     if (constellations.nonEmpty) {
       val constellationsStr = constellations.sortBy(_._1).map(_._2).mkString("、");
-      val msg = "# この時期21時ごろ見える天の川は、%sを通っています".format(constellationsStr);
+      val msg = "# この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
       putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
     }
   }
