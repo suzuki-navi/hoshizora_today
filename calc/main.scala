@@ -1787,7 +1787,7 @@ def isNightTime0(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
   //time - time.toInt >= 5.0 / 24 && time - time.toInt < 15.0 / 24;
-  time >= s && time - time.toInt < 15.0 / 24;
+  time >= s && time - time.toInt < 14.0 / 24;
 }
 
 def isNightTime2(time: Double): Boolean = {
@@ -3094,7 +3094,7 @@ tweetMoonRiseSet();
 
   def putTweetStarsA(): Unit = {
     var index: Int = -1;
-    (64 until period).foreach { day => // PERIOD
+    (73 until period).foreach { day => // PERIOD
       if (index < 0) {
         val time = startTime + day + 21.0 / 24.0; // PERIOD
         val sid = hcs.siderealTime(time);
