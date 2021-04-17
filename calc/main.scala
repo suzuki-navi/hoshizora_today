@@ -2801,7 +2801,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 //==============================================================================
 
 {
-  val altThres = 10 / PI57;
+  val altThres = 15 / PI57;
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0;
     val wday = TimeLib.wday(time);
@@ -2845,7 +2845,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 
 // 惑星が見えない場合
 {
-  val altThres = 10 / PI57;
+  val altThres = 15 / PI57;
 
   outerPlanets.zipWithIndex.foreach { case (planet, pi) =>
     (0 until period).foreach { day =>
@@ -2898,7 +2898,7 @@ tweetMoonRiseSet();
     var starsD: List[(Double, Array[Double], String, List[String])] = Nil;
     var starsE: List[(Double, Array[Double], String, List[String])] = Nil;
     var starsG: List[(Double, Array[Double], String, List[String])] = Nil;
-    val galaxy = List("さそり座", "いて座", "わし座", "はくちょう座", "カシオペア座", "ペルセウス座", "ぎょしゃ座", "ふたご座", "いっかくじゅう座", "とも座");
+    val galaxy = List("さそり座", "いて座", "わし座", "や座", "こぎつね座", "はくちょう座", "カシオペア座", "ペルセウス座", "ぎょしゃ座", "ふたご座", "いっかくじゅう座", "とも座");
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val t1 = line.substring(0, 6);
