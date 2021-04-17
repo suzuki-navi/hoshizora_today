@@ -1594,9 +1594,24 @@ def calcRiseSetCulmination(targetPlanet: JplData.TargetPlanet, altHor: Double):
   result.reverse.toIndexedSeq;
 }
 
-val moonRiseSetTimesData: IndexedSeq[(Double, Double, Double, Double)] = {
+val moonRiseSetTimesData: IndexedSeq[(Double, Double, Double, Double, Int)] = {
   val altHor = +0.4 / PI57; // だいたい
-  calcRiseSetCulmination(JplData.Moon, altHor);
+  val data: IndexedSeq[(Double, Double, Double, Double)] = calcRiseSetCulmination(JplData.Moon, altHor);
+  val data2 = Array.fill[Int](data.size)(-1);
+  (0 until 8).foreach { phase =>
+    val q = phase.toDouble / 8 * PI2;
+    MathLib.findMaxMinListDiscrete(0, data.size, 7) { p =>
+      Math.abs(MathLib.circleAdd(calcMoonPhase(data(p)._2) / 28 * PI2, -q));
+    }.foreach { case (p, flag) =>
+      if (flag < 0) {
+        data2(p) = phase;
+      }
+    }
+  }
+  (0 until data.size).map { i =>
+    val t = data(i);
+    (t._1, t._2, t._3, t._4, data2(i));
+  }
 }
 val moonRiseSetTimesDataTouch: Array[Boolean] = new Array[Boolean](moonRiseSetTimesData.size);
 
@@ -1617,18 +1632,37 @@ def touchMoonRiseSetStr(time0: Double): Option[String] = {
     moonRiseSetTimesDataTouch(p) = true;
     val data = moonRiseSetTimesData(p);
     val moonPhase = calcMoonPhase(data._2);
-    Some(if (isNextDay(data._1)) {
-      "翌日の月の出は%sごろ、南中は%sごろ(月相%.1f/28)、月の入りは%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
-    } else if (isNextDay(data._2)) {
-      "月の出は%sごろ、南中は翌日%sごろ(月相%.1f/28)、月の入りは翌日%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
-    } else if (isNextDay(data._3)) {
-      "月の出は%sごろ、南中は%sごろ(月相%.1f/28)、月の入りは翌日%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
+    val phaseStr = if (data._5 == 0) {
+      "\uD83C\uDF11";
+    } else if (data._5 == 1) {
+      "、新月と上弦の中間\uD83C\uDF12";
+    } else if (data._5 == 2) {
+      "\uD83C\uDF13";
+    } else if (data._5 == 3) {
+      "、上弦と満月の中間\uD83C\uDF14";
+    } else if (data._5 == 4) {
+      "\uD83C\uDF15";
+    } else if (data._5 == 5) {
+      "、満月と下弦の中間\uD83C\uDF16";
+    } else if (data._5 == 6) {
+      "\uD83C\uDF17";
+    } else if (data._5 == 7) {
+      "、下弦と新月の中間\uD83C\uDF18";
     } else {
-      "月の出は%sごろ、南中は%sごろ(月相%.1f/28)、月の入りは%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, timeStr0(data._3));
+      "";
+    }
+    Some(if (isNextDay(data._1)) {
+      "翌日の月の出は%sごろ、南中は%sごろ(月相%.1f/28%s)、月の入りは%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
+    } else if (isNextDay(data._2)) {
+      "月の出は%sごろ、南中は翌日%sごろ(月相%.1f/28%s)、月の入りは翌日%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
+    } else if (isNextDay(data._3)) {
+      "月の出は%sごろ、南中は%sごろ(月相%.1f/28%s)、月の入りは翌日%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
+    } else {
+      "月の出は%sごろ、南中は%sごろ(月相%.1f/28%s)、月の入りは%sごろ".format(
+        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
     });
   }
 }
@@ -2155,7 +2189,7 @@ def calcSunLng2(time: Double): Double = {
     }
   }
 
-  moonPhaseTerms.filter(_._2 != 4).map { case (time, term) =>
+  moonPhaseTerms.filter(_._2 != 4).filter(_._2 % 2 == 0).map { case (time, term) =>
     MoonPhaseTermTweetContent(time, term, 0, calcMoonConstellation(time));
   }.foreach(putTweet);
 }
