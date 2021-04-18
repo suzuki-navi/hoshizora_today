@@ -1715,12 +1715,11 @@ def tweetMoonRiseSet(): Unit = {
       val time = moonRiseSetTimesData(p)._1;
       val time2 = {
         val d = time - time.toInt;
-        if (d < 7.0 / 24) { // 9時～16時
+        if (d < 14.5 / 24) { // 9時～23時30分
           time;
-        } else if (d < 15.0 / 24) { // 16時～24時
-          time - d + 7.0 / 24; // 16時
-        } else if (d < 21.0 / 24) { // 0時～6時
-          time - d + 14.5 / 24; // 23時30分
+        } else if (d < 21.0 / 24) { // 23時30分～6時
+          //time - d + 14.5 / 24; // 23時30分
+          time - 0.1;
         } else { // 6時～9時
           time;
         }
@@ -1831,6 +1830,12 @@ def isNightTime2(time: Double): Boolean = {
   time >= s && time - time.toInt < 16.0 / 24;
 }
 
+def isNightTime3(time: Double): Boolean = {
+  val day = (time - startTime).toInt;
+  val s = sunsetTimes(day);
+  time - time.toInt >= 11.0 / 24 && time - time.toInt < 14.1 / 24;
+}
+
 def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = {
   val altThres0 = 10 / PI57;
   val sun_distanceThres = 20.0 / PI57;
@@ -1894,7 +1899,6 @@ case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[Tweet
   sunsetTweets: List[OnSunsetTweetContent],
   nightTweets: List[TweetContent]) {
   def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && daytimeTweets.isEmpty && nightTweets.isEmpty;
-  def isEmpty2: Boolean = sunsetTweets.isEmpty && nightTweets.isEmpty;
   def added(tc: TweetContent): DateTweets = {
     tc match {
       case tc: OnSunsetTweetContent =>
@@ -3134,8 +3138,8 @@ tweetMoonRiseSet();
         val sid = hcs.siderealTime(time);
         val time0 = if (MathLib.circleAdd(sid, -starsA(index)._1) >= 0) {
           time;
-        } else if (getTweets(time).isEmpty2) {
-          val sid2 = MathLib.circleAdd(sid, PI2 / 12);
+        } else if (getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
+          val sid2 = MathLib.circleAdd(sid, 2.0 * PI2 / 24);
           if (MathLib.circleAdd(sid2, -starsA(index)._1) >= 0) {
             time + MathLib.circleAdd(starsA(index)._1, -sid) / PI2;
           } else {
