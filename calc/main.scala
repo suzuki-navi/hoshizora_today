@@ -1090,23 +1090,24 @@ object MathLib {
     @scala.annotation.tailrec
     def sub(start: Int, end: Int): Int = {
       if (end - start == 1) {
-        end;
+        start;
+      } else if (end - start == 2) {
+        if (f(seq(start)) >= 0.0) {
+          start;
+        } else {
+          start + 1;
+        }
       } else {
         val mid = (end + start) / 2;
-        if (f(seq(mid)) < 0.0) {
+        val midf = f(seq(mid));
+        if (midf <= 0.0) {
           sub(mid, end);
         } else {
-          sub(start, mid);
+          sub(start, mid + 1);
         }
       }
     }
-    if (f(seq(0)) > 0.0) {
-      -1;
-    } else if (f(seq(seq.size - 1)) < 0.0) {
-      -1;
-    } else {
-      sub(0, seq.size);
-    }
+    sub(0, seq.size);
   }
 
   // 2つ目の返値 +1: 最大値
