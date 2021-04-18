@@ -2160,20 +2160,7 @@ def calcSunLng2(time: Double): Double = {
       }
     }.foreach(putTweet);
 
-    val midAltData = (0 until fullMoons.size).flatMap { i =>
-      val time = fullMoons(i);
-      val p1 = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._2 - time);
-      if (p1 >= 1) {
-        val p2 = if (moonRiseSetTimesData(p1 - 1)._2 + moonRiseSetTimesData(p1)._2 < 2 * time) {
-          p1;
-        } else {
-          p1 - 1;
-        }
-        Some((moonRiseSetTimesData(p2)._2, moonRiseSetTimesData(p2)._4));
-      } else {
-        None;
-      }
-    }
+    val midAltData = moonRiseSetTimesData.filter(_._5 == 4).map(t => (t._2, t._4));
     (0 until midAltData.size).foreach { i =>
       val (time, alt) = midAltData(i);
       if (i > 0 && i < midAltData.size - 1) {
