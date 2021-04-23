@@ -3268,7 +3268,7 @@ tweetMoonRiseSet();
       if (msg.indexOf("ERROR") >= 0) {
         println("%s #%s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
       } else if (msg.length > 140) {
-        println("%s #TOO_LONG %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
+        println("%s #TOO_LONG(%d) %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg.length, msg));
       } else {
         println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
       }
