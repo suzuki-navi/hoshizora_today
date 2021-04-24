@@ -2916,18 +2916,19 @@ tweetMoonRiseSet();
     def hashtags: List[String] = hashtags2 ::: "星空" :: "星座" :: Nil;
     def starNames: List[String] = Nil;
   }
-  val (starsA, starsB, starsC, starsD, starsE, starsG) = {
+
+  case class Constellation (ra: Double, dec: Double, xyz: Array[Double], name: String, hashtags: List[String],
+    eclipticalFlag: Boolean, galaxyFlag: Boolean);
+
+  val (culminationContents, lunchTimeContents, constellationData, starData) = {
     val source = scala.io.Source.fromFile(constellationsDataPath);
-    var starsA: List[(Double, String, List[String])] = Nil;
-    var starsB: List[(Double, String, List[String])] = Nil;
-    var starsC: List[(Double, Double, Array[Double], String, List[String])] = Nil;
-    var starsD: List[(Double, Array[Double], String, List[String])] = Nil;
-    var starsE: List[(Double, Array[Double], String, List[String])] = Nil;
-    var starsG: List[(Double, Array[Double], String, List[String])] = Nil;
-    val galaxy = List("さそり座", "いて座", "わし座", "や座", "こぎつね座", "はくちょう座", "カシオペア座", "ペルセウス座", "ぎょしゃ座", "ふたご座", "いっかくじゅう座", "とも座");
+    var culminationContents: List[(Double, String, List[String])] = Nil;
+    var lunchTimeContents:   List[(Double, String, List[String])] = Nil;
+    var constellationData: List[Constellation] = Nil;
+    var starData: List[(Double, Array[Double], String, List[String])] = Nil;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
-        val t1 = line.substring(0, 6);
+        val raStr = line.substring(0, 6);
         val (content0: String, hashtags: List[String]) = {
           var content0 = line.substring(7).trim;
           var hashtags: List[String] = Nil;
@@ -2939,67 +2940,67 @@ tweetMoonRiseSet();
           }
           (content0, hashtags.reverse);
         }
-        val ra = (t1.substring(0, 2).toInt.toDouble + t1.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
-        if (content0.matches("[CDE] [-+.0-9]+ .+")) {
-          val p = content0.indexOf(" ", 2);
-          val dec = content0.substring(2, p).toDouble / PI57;
-          val content = content0.substring(p + 1);
+        def calcRa(raStr: String): Double = {
+          (raStr.substring(0, 2).toInt.toDouble + raStr.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
+        }
+        def calcDecXyz(raStr: String, decStr: String): (Double, Double, Array[Double]) = {
+          val ra = calcRa(raStr);
+          val dec = decStr.toDouble / PI57;
           val z = Math.sin(dec);
           val xy = Math.cos(dec);
           val x = xy * Math.cos(ra);
           val y = xy * Math.sin(ra);
           val xyz = Array(x, y, z);
-          if (content0.startsWith("C ")) {
-            starsC = (ra, dec, xyz, content, hashtags) :: starsC;
-          } else if (content0.startsWith("D ")) {
-            starsD = (ra, xyz, content, hashtags) :: starsD;
-          } else if (content0.startsWith("E ")) {
-            starsC = (ra, dec, xyz, content, hashtags) :: starsC;
-            starsE = (ra, xyz, content, hashtags) :: starsE;
-          }
-          if (galaxy.contains(content)) {
-            starsG = (ra, xyz, content, hashtags) :: starsG;
-          }
-        } else {
-          if (content0.startsWith("A ")) {
-            val content = content0.substring(2);
-            starsA = (ra, content, hashtags) :: starsA;
-          } else if (content0.startsWith("B ")) {
-            val content = content0.substring(2);
-            starsB = (ra, content, hashtags) :: starsB;
-          } else {
-            val content = content0;
-            starsA = (ra, content, hashtags) :: starsA;
-          }
+          (ra, dec, xyz);
+        }
+        val ConstellationPattern = ("([-+.0-9]+)\\s+Constellation\\s+(Ecliptical\\s+)?(Galaxy\\s+)?(.+)").r;
+        val StarsPattern = "([-+.0-9]+)\\s+Stars\\s+Bright\\s+(.+)".r;
+        val CulminationPattern = "Cul\\s+(.+)".r;
+        val LunchTimeContentPattern = "Lunch\\s+(.+)".r;
+        content0 match {
+          case ConstellationPattern(decStr, eclipticalStr, galaxyStr, content) =>
+            val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
+            val eclipticalFlag = eclipticalStr != null;
+            val galaxyFlag = galaxyStr != null;
+            constellationData = Constellation(ra, dec, xyz, content, hashtags,
+              eclipticalFlag, galaxyFlag) :: constellationData;
+          case StarsPattern(decStr, content) =>
+            val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
+            starData = (ra, xyz, content, hashtags) :: starData;
+          case CulminationPattern(content) =>
+            val ra = calcRa(raStr);
+            culminationContents = (ra, content, hashtags) :: culminationContents;
+          case LunchTimeContentPattern(content) =>
+            val ra = calcRa(raStr);
+            lunchTimeContents = (ra, content, hashtags) :: lunchTimeContents;
+          case _ => // nothing
         }
       }
     }
     source.close();
     (
-      starsA.reverse.toIndexedSeq.sortBy(_._1),
-      starsB.reverse.toIndexedSeq.sortBy(_._1),
-      starsC.reverse.toIndexedSeq.sortBy(_._1),
-      starsD.reverse.toIndexedSeq.sortBy(_._1),
-      starsE.reverse.toIndexedSeq.sortBy(_._1),
-      starsG.reverse.toIndexedSeq.sortBy(_._1),
+      culminationContents.reverse.toIndexedSeq.sortBy(_._1),
+      lunchTimeContents.reverse.toIndexedSeq.sortBy(_._1),
+      constellationData.reverse.toIndexedSeq.sortBy(_.ra),
+      starData.reverse.toIndexedSeq.sortBy(_._1),
     );
   }
 
   val altHor = -0.90 / PI57;
 
   // この時期21時ごろ見えやすい星座
-  def putTweetStarsC(day: Int): Unit = {
+  def putTweetConstellations21(day: Int): Unit = {
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val utc = time;
     val ut1 = utc; // 近似的
     val tdb = TimeLib.mjdutcToTdb(utc);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = starsC.flatMap { case (ra, dec, xyz, name, hashtags) =>
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+    val constellations = constellationData.flatMap { constellation =>
+      val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
       if (alt >= altThres) {
-        Some((azi, name));
+        Some((azi, constellation.name));
       } else {
         None;
       }
@@ -3010,19 +3011,19 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見える南の空低い星座
-  def putTweetStarsCSouth(day: Int): Unit = {
+  def putTweetConstellationsSouth(day: Int): Unit = {
     val decThres = - PI5 + tokyoLat + 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val utc = time;
     val ut1 = utc; // 近似的
     val tdb = TimeLib.mjdutcToTdb(utc);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = starsC.flatMap { case (ra, dec, xyz, name, hashtags) =>
-      if (dec < decThres) {
-        val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+    val constellations = constellationData.flatMap { constellation =>
+      if (constellation.dec < decThres) {
+        val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
         val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
         if (alt > 0.0) {
-          Some((azi, name));
+          Some((azi, constellation.name));
         } else {
           None;
         }
@@ -3038,7 +3039,7 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見える明るい星
-  def putTweetStarsD(day: Int): Unit = {
+  def putTweetBrightStars(day: Int): Unit = {
     val altThres = 10.0 / PI57;
     //val altThres = 0.0;
     val time = startTime + day + 21.0 / 24;
@@ -3046,7 +3047,7 @@ tweetMoonRiseSet();
     val ut1 = utc; // 近似的
     val tdb = TimeLib.mjdutcToTdb(utc);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = (starsD.flatMap { case (ra, xyz, name, hashtags) =>
+    val constellations = (starData.flatMap { case (ra, xyz, name, hashtags) =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
       if (alt >= altThres) {
@@ -3070,19 +3071,19 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見えやすい黄道十二星座
-  def putTweetStarsE(day: Int): Unit = {
+  def putTweetConstellationsEcliptical(day: Int): Unit = {
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val utc = time;
     val ut1 = utc; // 近似的
     val tdb = TimeLib.mjdutcToTdb(utc);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = starsE.flatMap { case (ra, xyz, name, hashtags) =>
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+    val constellations = constellationData.filter(_.eclipticalFlag).flatMap { constellation =>
+      val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
       if (alt >= altThres) {
         val aziAltStr = Hcs.aziAltToNaturalString(azi, alt);
-        Some((aziAltStr, azi, name));
+        Some((aziAltStr, azi, constellation.name));
       } else {
         None;
       }
@@ -3097,21 +3098,21 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見える天の川
-  def putTweetStarsG(day: Int): Unit = {
+  def putTweetConstellationsGalaxy(day: Int): Unit = {
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val utc = time;
     val ut1 = utc; // 近似的
     val tdb = TimeLib.mjdutcToTdb(utc);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = starsG.flatMap { case (ra, xyz, name, hashtags) =>
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+    val constellations = constellationData.filter(_.galaxyFlag).flatMap { constellation =>
+      val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAlt(xyz2, ut1);
       if (alt >= altThres) {
         val sid = hcs.siderealTime(ut1);
-        val ra2 = ra - sid;
+        val ra2 = constellation.ra - sid;
         val ra3 = if (ra2 < -PI) ra2 + PI2 else if (ra2 >= PI) ra2 - PI2 else ra2;
-        Some((ra3, name));
+        Some((ra3, constellation.name));
       } else {
         None;
       }
@@ -3123,25 +3124,26 @@ tweetMoonRiseSet();
     }
   }
 
-  def putTweetStarsA(): Unit = {
+  // 恒星の南中
+  def putTweetCulminations(): Unit = {
     var index: Int = -1;
     (73 until period).foreach { day => // PERIOD
       if (index < 0) {
         val time = startTime + day + 21.0 / 24.0; // PERIOD
         val sid = hcs.siderealTime(time);
-        index = starsA.indexWhere(_._1 > sid);
+        index = culminationContents.indexWhere(_._1 > sid);
         if (index < 0) {
           index = 0;
         }
       } else {
         val time = startTime + day + 21.0 / 24.0;
         val sid = hcs.siderealTime(time);
-        val time0 = if (MathLib.circleAdd(sid, -starsA(index)._1) >= 0) {
+        val time0 = if (MathLib.circleAdd(sid, -culminationContents(index)._1) >= 0) {
           time;
         } else if (getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
           val sid2 = MathLib.circleAdd(sid, 2.0 * PI2 / 24);
-          if (MathLib.circleAdd(sid2, -starsA(index)._1) >= 0) {
-            time + MathLib.circleAdd(starsA(index)._1, -sid) / PI2;
+          if (MathLib.circleAdd(sid2, -culminationContents(index)._1) >= 0) {
+            time + MathLib.circleAdd(culminationContents(index)._1, -sid) / PI2;
           } else {
             0.0;
           }
@@ -3150,13 +3152,13 @@ tweetMoonRiseSet();
         }
         if (time0 > 0.0) {
           val msg = if (calcPlanetXyzAziAlt(time0, JplData.Moon)._3 >= altHor) {
-            starsA(index)._2;
+            culminationContents(index)._2;
           } else {
-            starsA(index)._2 + "。月明かりなし";
+            culminationContents(index)._2 + "。月明かりなし";
           }
-          putTweet(StarTweetContent(time0, msg, starsA(index)._3));
+          putTweet(StarTweetContent(time0, msg, culminationContents(index)._3));
           index += 1;
-          if (index == starsA.size) {
+          if (index == culminationContents.size) {
             index = 0;
           }
         }
@@ -3165,13 +3167,13 @@ tweetMoonRiseSet();
   }
 
   // 星座の解説など
-  def putTweetStarsB(): Unit = {
+  def putTweetLunchTimeContents(): Unit = {
     var day1: Int = 62; // PERIOD
     var day2: Int = 62; // PERIOD
     var index: Int = {
       val time = startTime + day1 + 21.0 / 24.0; // PERIOD
       val sid = hcs.siderealTime(time);
-      val index = starsB.indexWhere(_._1 > sid);
+      val index = lunchTimeContents.indexWhere(_._1 > sid);
       if (index < 0) {
         0;
       } else {
@@ -3180,17 +3182,17 @@ tweetMoonRiseSet();
     }
     while (day1 < period) {
       val sid = hcs.siderealTime(startTime + day1 + 21.0 / 24);
-      if (MathLib.circleAdd(sid, -starsB(index)._1) >= 0) {
-        val msg = starsB(index)._2;
+      if (MathLib.circleAdd(sid, -lunchTimeContents(index)._1) >= 0) {
+        val msg = lunchTimeContents(index)._2;
         {
           val p = (day1 until (day2 + 14)).indexWhere { d =>
             getTweets(startTime + d).daytimeTweets.isEmpty;
           }
           day1 = if (p < 0) day1 else day1 + p;
         }
-        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, starsB(index)._3));
+        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, lunchTimeContents(index)._3));
         index += 1;
-        if (index == starsB.size) {
+        if (index == lunchTimeContents.size) {
           index = 0;
         }
       }
@@ -3216,26 +3218,16 @@ tweetMoonRiseSet();
     }
     var day: Int = 90; // PERIOD
     while (day < period) {
-      while (!isTweet(day)) { day += 1; }
-      putTweetStarsC(day);
-      while (!isTweet(day)) { day += 1; }
-      putTweetStarsCSouth(day);
-      while (!isTweet(day)) { day += 1; }
-      putTweetStarsD(day);
-      while (!isTweet(day)) { day += 1; }
-      putTweetStarsG(day);
-      while (!isTweet(day)) { day += 1; }
-      putTweetStarsE(day);
-      // この時期21時ごろ見えやすい星座
-      // この時期21時ごろ見える南の空低い星座
-      // この時期21時ごろ見える明るい星
-      // この時期21時ごろ見える天の川
-      // この時期21時ごろ見えやすい黄道十二星座
+      while (!isTweet(day)) { day += 1; }; putTweetConstellations21(day);
+      while (!isTweet(day)) { day += 1; }; putTweetConstellationsSouth(day);
+      while (!isTweet(day)) { day += 1; }; putTweetBrightStars(day);
+      while (!isTweet(day)) { day += 1; }; putTweetConstellationsGalaxy(day);
+      while (!isTweet(day)) { day += 1; }; putTweetConstellationsEcliptical(day);
     }
   }
 
-  putTweetStarsA();
-  putTweetStarsB();
+  putTweetCulminations();
+  putTweetLunchTimeContents();
 }
 
 //==============================================================================
