@@ -960,21 +960,19 @@ object Constellations {
     );
   }
 
-  private def icrsToConstellation(lng: Double, lat: Double): (String, String, List[String]) = {
+  private def icrsToConstellation(lng: Double, lat: Double): (String, List[String]) = {
     val lng5 = (lng * PI57 / 5).toInt * 5;
     val lat5 = ((lat * PI57 + 90) / 5).toInt * 5 - 90;
     val key = "%2dh%02dm,%3d".format(lng5 / 15, lng5 % 15 * 4, lat5);
-    val (cons, hashtags) = constellationsMap.getOrElse(key, ("-", Nil));
+    val (cons, hashtags) = constellationsMap.getOrElse(key, ("", Nil));
     if (cons == "") {
-      ("#", "(%s)".format(key), hashtags);
-    } else if (cons == "-") {
-      ("##", "(%s)".format(key), hashtags);
+      ("(ERROR %s)".format(key), hashtags);
     } else {
-      ("", cons, hashtags);
+      (cons, hashtags);
     }
   }
 
-  def icrsToConstellation(xyz: Array[Double]): (String, String, List[String]) = {
+  def icrsToConstellation(xyz: Array[Double]): (String, List[String]) = {
     val lng = VectorLib.xyzToLng(xyz);
     val lat = VectorLib.xyzToLat(xyz);
     icrsToConstellation(lng, lat);
@@ -1998,7 +1996,7 @@ def calcSunLng2(time: Double): Double = {
 
 {
   case class MoonPhaseTermTweetContent(rawTime: Double, term: Int, distanceFlag: Int,
-    cons: Option[(String, String, List[String])]) extends TweetContent {
+    cons: Option[(String, List[String])]) extends TweetContent {
 
     private[this] val riseset: String = {
       touchMoonRiseSetStr(rawTime) match {
@@ -2017,16 +2015,11 @@ def calcSunLng2(time: Double): Double = {
         termStrs(term);
       }
       cons match {
-        case Some((conscomment, cons, hashtags)) => "%s%s。%sにいます%s".format(conscomment, msg, cons, riseset);
+        case Some((cons, hashtags)) => "%s。%sにいます%s".format(msg, cons, riseset);
         case None => "%s%s".format(msg, riseset);
       }
     }
-    def hashtags: List[String] = {
-      cons match {
-        case Some((conscomment, cons, hashtags)) => hashtags;
-        case None => Nil;
-      }
-    }
+    def hashtags: List[String] = cons.map(_._2).getOrElse(Nil);
     def starNames: List[String] = List("月");
 
     private[this] val termStrs = IndexedSeq(
@@ -2043,7 +2036,7 @@ def calcSunLng2(time: Double): Double = {
 
   val altThres0 = 10 / PI57;
 
-  def calcMoonConstellation(time: Double): Option[(String, String, List[String])] = {
+  def calcMoonConstellation(time: Double): Option[(String, List[String])] = {
     if (isNightTime2(time)) {
       val tdb = TimeLib.mjdutcToTdb(time);
       val xyz = jplData.calcMoonFromEarth(tdb);
@@ -2051,8 +2044,8 @@ def calcSunLng2(time: Double): Double = {
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres0) {
-        val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
-        Some((conscomment, cons, hashtags));
+        val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
+        Some((cons, hashtags));
       } else {
         None;
       }
@@ -2232,8 +2225,8 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     case None =>
       putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
     case Some(xyz) =>
-      val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
-      putTweet(time2, "%s%sが%s。%sにいます #%s".format(conscomment, planetName, content, cons, planetName) +
+      val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
+      putTweet(time2, "%sが%s。%sにいます #%s".format(planetName, content, cons, planetName) +
         hashtags.map(" #" + _).mkString);
     }
   }
@@ -2720,7 +2713,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       } match {
         case None => ;
         case Some((time, xyz, azi, alt)) =>
-          val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+          val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
           val moonPhase = calcMoonPhase(time);
           val moonStr: String = {
             val s = moonPhaseNaturalString(moonPhase);
@@ -2730,7 +2723,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
               "。" + s + "です";
             }
           }
-          putTweet(time, "%s月は%sにいます。月相%.1f/28%s".format(conscomment, cons, moonPhase, moonStr) +
+          putTweet(time, "月は%sにいます。月相%.1f/28%s".format(cons, moonPhase, moonStr) +
             hashtags.map(" #" + _).mkString);
       }
     }
@@ -2774,10 +2767,10 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         } match {
           case None => ;
           case Some((time, xyz, azi, alt)) =>
-            val (conscomment, cons, hashtags) = Constellations.icrsToConstellation(xyz);
+            val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
             val moonPhase = calcMoonPhase(time);
             val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
-            putTweet(time - 1.0 / (24 * 4), "%s%sは%s、%sにいます #%s".format(conscomment, planetName, hcsStr, cons, planetName) +
+            putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
               hashtags.map(" #" + _).mkString);
         }
     }
