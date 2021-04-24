@@ -884,13 +884,14 @@ object Constellations {
   case class Constellation (ra: Double, dec: Double, xyz: Array[Double], name: String, hashtags: List[String],
     eclipticalFlag: Boolean, galaxyFlag: Boolean);
 
-  val (culminationContents, lunchTimeContents, constellationData, starData) = {
+  val (culminationContents, lunchTimeContents, constellationData, starData, constellationsMap) = {
     import Ordering.Double.IeeeOrdering;
     val source = scala.io.Source.fromFile(constellationsDataPath);
     var culminationContents: List[(Double, String, List[String])] = Nil;
     var lunchTimeContents:   List[(Double, String, List[String])] = Nil;
     var constellationData: List[Constellation] = Nil;
     var starData: List[(Double, Array[Double], String, List[String])] = Nil;
+    var constellationsMap: Map[String, (String, List[String])] = Map.empty;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val raStr = line.substring(0, 6);
@@ -918,10 +919,11 @@ object Constellations {
           val xyz = Array(x, y, z);
           (ra, dec, xyz);
         }
-        val ConstellationPattern = ("([-+.0-9]+)\\s+Constellation\\s+(Ecliptical\\s+)?(Galaxy\\s+)?(.+)").r;
+        val ConstellationPattern = "([-+.0-9]+)\\s+Constellation\\s+(Ecliptical\\s+)?(Galaxy\\s+)?(.+)".r;
         val StarsPattern = "([-+.0-9]+)\\s+Stars\\s+Bright\\s+(.+)".r;
         val CulminationPattern = "Cul\\s+(.+)".r;
         val LunchTimeContentPattern = "Lunch\\s+(.+)".r;
+        val AreaPattern = "([-+.0-9]+)\\sArea\\s(.+)".r;
         content0 match {
           case ConstellationPattern(decStr, eclipticalStr, galaxyStr, content) =>
             val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
@@ -938,6 +940,12 @@ object Constellations {
           case LunchTimeContentPattern(content) =>
             val ra = calcRa(raStr);
             lunchTimeContents = (ra, content, hashtags) :: lunchTimeContents;
+          case AreaPattern(decStr, content) =>
+            val lngH = raStr.substring(0, 2).toInt;
+            val lngM = raStr.substring(3, 5).toInt / 20 * 20;
+            val lat5 = decStr.toInt;
+            val key = "%2dh%02dm,%3d".format(lngH, lngM, lat5);
+            constellationsMap = constellationsMap ++ Map(key -> (content, hashtags));
           case _ => // nothing
         }
       }
@@ -948,175 +956,9 @@ object Constellations {
       lunchTimeContents.reverse.toIndexedSeq.sortBy(_._1),
       constellationData.reverse.toIndexedSeq.sortBy(_.ra),
       starData.reverse.toIndexedSeq.sortBy(_._1),
+      constellationsMap,
     );
   }
-
-  val constellationsMap = Map[String, (String, List[String])] (
-    " 0h00m, -5" -> ("うお座の西側の魚(ペガスス座の南)の南", Nil),
-
-    " 0h20m, -5" -> ("くじら座のしっぽ付近", Nil),
-
-    " 0h40m,  0" -> ("うお座の西側の魚のしっぽ付近", Nil),
-
-    " 1h00m,  0" -> ("うお座の西側の魚(ペガスス座の南)のしっぽ付近", Nil),
-
-    " 1h20m,  5" -> ("うお座の2匹の魚が接続されている付近", Nil),
-    " 1h20m, 10" -> ("うお座の東側の魚(アンドロメダ座の南)のしっぽ付近", Nil),
-
-    " 1h40m,  5" -> ("うお座の2匹の魚の付け根付近", Nil),
-    " 1h40m, 10" -> ("うお座の東側の魚(アンドロメダ座の南)のしっぽ付近", Nil),
-
-    " 2h00m,  5" -> ("くじら座の頭付近", Nil),
-    " 2h00m, 10" -> ("おひつじ座の頭とくじら座の頭の間", Nil),
-    " 2h00m, 15" -> ("おひつじ座の頭付近", Nil),
-
-    " 2h20m, 10" -> ("おひつじ座とくじら座の頭の間", Nil),
-    " 2h20m, 15" -> ("おひつじ座の南", Nil),
-
-    " 2h40m, 10" -> ("おひつじ座とくじら座の頭の間", Nil),
-    " 2h40m, 15" -> ("おひつじ座の南", Nil),
-
-    " 3h00m, 15" -> ("おひつじ座のしっぽ側", Nil),
-
-    " 3h20m, 15" -> ("おうし座の西", Nil),
-    " 3h20m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
-
-    " 3h40m, 15" -> ("おうし座すばるの南", List("プレアデス星団")),
-    " 3h40m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
-
-    " 4h00m, 15" -> ("おうし座ヒアデス星団の西", Nil),
-    " 4h00m, 20" -> ("おうし座すばる付近", List("プレアデス星団")),
-
-    " 4h20m, 20" -> ("おうし座とペルセウス座とぎょしゃ座の間", Nil),
-
-    " 4h40m, 20" -> ("おうし座ヒアデス星団の北東", Nil),
-
-    " 5h00m, 20" -> ("おうし座の角付近", Nil),
-
-    " 5h20m, 20" -> ("おうし座の角とぎょしゃ座付近", Nil),
-
-    " 5h40m, 20" -> ("おうし座の角とオリオン座の腕付近", List("オリオン座")),
-
-    " 6h00m, 20" -> ("ふたご座の西側の子の足元とオリオン座の腕付近", List("オリオン座")),
-
-    " 6h20m, 20" -> ("ふたご座の西側の子の足元付近", Nil),
-    " 6h20m, 25" -> ("ふたご座の西側の子の腰付近", Nil),
-
-    " 6h40m, 20" -> ("ふたご座の2人の足元付近", Nil),
-    " 6h40m, 25" -> ("ふたご座の西側の子の胴体付近", Nil),
-
-    " 7h00m, 20" -> ("ふたご座の東側の子の腰付近", Nil),
-    " 7h00m, 25" -> ("ふたご座の西側の子の胴体付近", Nil),
-
-    " 7h20m, 20" -> ("ふたご座の東側の子の胴体付近", Nil),
-    " 7h20m, 25" -> ("ふたご座の東側の子の胴体付近", Nil),
-
-    " 7h40m, 20" -> ("ふたご座ポルックスの南でふたご座の東", Nil),
-
-    " 8h00m, 20" -> ("かに座の西", Nil),
-
-    " 8h20m, 20" -> ("かに座", Nil),
-
-    " 8h40m, 20" -> ("かに座", Nil),
-
-    " 9h00m, 20" -> ("かに座の東", Nil),
-
-    " 9h20m, 15" -> ("しし座とかに座の間", Nil),
-
-    " 9h40m, 15" -> ("しし座の西", Nil),
-
-    "10h00m, 15" -> ("しし座の肩付近", Nil),
-
-    "10h20m, 10" -> ("しし座レグルスの東", Nil),
-    "10h20m, 15" -> ("しし座の中央", Nil),
-
-    "10h40m, 10" -> ("しし座の腹付近", Nil),
-
-    "11h00m, 10" -> ("しし座の後ろ足付近", Nil),
-
-    "11h20m,  5" -> ("しし座の後ろ足とおとめ座の間", Nil),
-
-    "11h40m,  5" -> ("おとめ座の頭付近", Nil),
-
-    "12h00m,  0" -> ("おとめ座の四角形の西", Nil),
-    "12h00m,  5" -> ("おとめ座の頭付近", Nil),
-
-    "12h20m,  0" -> ("おとめ座の四角形の西", Nil),
-
-    "12h40m,  0" -> ("おとめ座の四角形", Nil),
-    "12h40m, -5" -> ("おとめ座の四角形", Nil),
-
-    "13h00m, -5" -> ("おとめ座の四角形", Nil),
-
-    "13h20m, -5" -> ("おとめ座スピカの北", Nil),
-    "13h20m,-10" -> ("おとめ座スピカの北", Nil),
-
-    "13h40m,-10" -> ("おとめ座スピカの東", Nil),
-
-    "14h00m,-10" -> ("おとめ座スピカの東", Nil),
-    "14h00m,-15" -> ("おとめ座スピカとてんびん座の間", Nil),
-
-    "14h20m,-15" -> ("てんびん座の西おとめ座との間", Nil),
-
-    "14h40m,-15" -> ("てんびん座の西", Nil),
-
-    "15h00m,-20" -> ("てんびん座", Nil),
-
-    "15h20m,-20" -> ("てんびん座", Nil),
-
-    "15h40m,-20" -> ("てんびん座の東でさそり座との間", Nil),
-
-    "16h00m,-25" -> ("さそり座アンタレスの北西", Nil),
-
-    "16h20m,-25" -> ("さそり座アンタレスの北のへびつかい座", Nil),
-
-    "16h40m,-25" -> ("さそり座アンタレスの北東のへびつかい座", Nil),
-
-    "17h00m,-25" -> ("さそり座アンタレスの東のへびつかい座", Nil),
-
-    "17h20m,-25" -> ("さそり座アンタレスの東のへびつかい座", Nil),
-
-    "17h40m,-30" -> ("いて座さそり座へびつかい座の間", Nil),
-
-    "18h00m,-30" -> ("いて座の西", Nil),
-
-    "18h20m,-30" -> ("いて座南斗六星", Nil),
-
-    "18h40m,-30" -> ("いて座南斗六星", Nil),
-
-    "19h00m,-30" -> ("いて座南斗六星の先", Nil),
-
-    "19h20m,-30" -> ("いて座南斗六星の東", Nil),
-
-    "20h00m,-25" -> ("やぎ座の西部", Nil),
-
-    "20h20m,-20" -> ("やぎ座の西部", Nil),
-
-    "20h40m,-20" -> ("やぎ座の中央", Nil),
-    "20h40m,-25" -> ("やぎ座の中央", Nil),
-
-    "21h00m,-20" -> ("やぎ座の中央", Nil),
-    "21h00m,-25" -> ("やぎ座の中央", Nil),
-
-    "21h20m,-20" -> ("やぎ座の東部", Nil),
-
-    "21h40m,-15" -> ("やぎ座とみずがめ座の間", Nil),
-    "21h40m,-20" -> ("やぎ座の東部", Nil),
-
-    "22h00m,-20" -> ("みずがめ座の南部でやぎ座の東", Nil),
-    "22h00m,-15" -> ("みずがめ座の南部でやぎ座の東", Nil),
-
-    "22h20m,-15" -> ("みずがめ座の南部でやぎ座の東", Nil),
-    "22h20m,-20" -> ("みずがめ座の南部でやぎ座の東", Nil),
-
-    "22h40m,-15" -> ("みずがめ座の南部でうお座の西側の魚の頭の南西", Nil),
-
-    "23h00m,-15" -> ("みずがめ座の南部でうお座の西側の魚の頭の南", Nil),
-
-    "23h20m,-10" -> ("みずがめ座とうお座の西側の魚の頭の間", Nil),
-
-    "23h40m,-10" -> ("みずがめ座とうお座の西側の魚の頭の間", Nil),
-  );
 
   private def icrsToConstellation(lng: Double, lat: Double): (String, String, List[String]) = {
     val lng5 = (lng * PI57 / 5).toInt * 5;
