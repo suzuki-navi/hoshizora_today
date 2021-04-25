@@ -3064,19 +3064,14 @@ tweetMoonRiseSet();
 // なにもツイートのない日付
 
 {
-  var daytimeEmptyCount: Int = 0;
   (0 until period).foreach { day =>
     val time = startTime + day;
-    if (getTweets(time).daytimeTweets.isEmpty) {
-      val date = TimeLib.modifiedJulianDayToStringJSTDate(time + 12.0 / 24);
-      //System.err.println("%s #empty".format(date));
-      daytimeEmptyCount += 1;
-    }
     if (getTweets(time).isEmpty) {
       putTweet(time, "#empty");
+    } else if (getTweets(time).daytimeTweets.isEmpty) {
+      putTweet(time, "#daytime empty");
     }
   }
-  System.err.println("daytimeEmptyCount: %d".format(daytimeEmptyCount));
 }
 
 //==============================================================================
