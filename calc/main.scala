@@ -1635,8 +1635,7 @@ def tweetMoonRiseSet(): Unit = {
         if (d < 14.5 / 24) { // 9時～23時30分
           time;
         } else if (d < 21.0 / 24) { // 23時30分～6時
-          //time - d + 14.5 / 24; // 23時30分
-          time - 0.1;
+          time - d + 14.5 / 24; // 23時30分
         } else { // 6時～9時
           time;
         }
@@ -2723,7 +2722,8 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
               "。" + s + "です";
             }
           }
-          putTweet(time, "月は%sにいます。月相%.1f/28%s".format(cons, moonPhase, moonStr) +
+          val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
+          putTweet(time, "月は%s、%sにいます。月相%.1f/28%s".format(hcsStr, cons, moonPhase, moonStr) +
             hashtags.map(" #" + _).mkString);
       }
     }
