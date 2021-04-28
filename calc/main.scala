@@ -887,7 +887,7 @@ object Constellations {
   val (culminationContents, lunchTimeContents, constellationData, starData, constellationsMap) = {
     import Ordering.Double.IeeeOrdering;
     val source = scala.io.Source.fromFile(constellationsDataPath);
-    var culminationContents: List[(Double, String, List[String])] = Nil;
+    var culminationContents: List[(Double, String, List[String], List[String])] = Nil;
     var lunchTimeContents:   List[(Double, String, List[String])] = Nil;
     var constellationData: List[Constellation] = Nil;
     var starData: List[(Double, Array[Double], String, List[String])] = Nil;
@@ -895,16 +895,27 @@ object Constellations {
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val raStr = line.substring(0, 6);
-        val (content0: String, hashtags: List[String]) = {
+        val (content0: String, hashtags: List[String], starNames: List[String]) = {
           var content0 = line.substring(7).trim;
+          var starNames: List[String] = Nil;
           var hashtags: List[String] = Nil;
-          var p: Int = content0.lastIndexOf("#");
-          while (p >= 0) {
-            hashtags = content0.substring(p + 1).trim :: hashtags;
-            content0 = content0.substring(0, p).trim;
-            p = content0.lastIndexOf("#");
+          {
+            var p: Int = content0.lastIndexOf("$");
+            while (p >= 0) {
+              starNames = content0.substring(p + 1).trim :: starNames;
+              content0 = content0.substring(0, p).trim;
+              p = content0.lastIndexOf("$");
+            }
           }
-          (content0, hashtags.reverse);
+          {
+            var p: Int = content0.lastIndexOf("#");
+            while (p >= 0) {
+              hashtags = content0.substring(p + 1).trim :: hashtags;
+              content0 = content0.substring(0, p).trim;
+              p = content0.lastIndexOf("#");
+            }
+          }
+          (content0, hashtags.reverse, starNames);
         }
         def calcRa(raStr: String): Double = {
           (raStr.substring(0, 2).toInt.toDouble + raStr.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
@@ -936,7 +947,7 @@ object Constellations {
             starData = (ra, xyz, content, hashtags) :: starData;
           case CulminationPattern(content) =>
             val ra = calcRa(raStr);
-            culminationContents = (ra, content, hashtags) :: culminationContents;
+            culminationContents = (ra, content, hashtags, starNames) :: culminationContents;
           case LunchTimeContentPattern(content) =>
             val ra = calcRa(raStr);
             lunchTimeContents = (ra, content, hashtags) :: lunchTimeContents;
@@ -1804,9 +1815,8 @@ sealed trait TweetContent {
   def date: String = TimeLib.modifiedJulianDayToStringJSTDate(time);
 }
 
-case class LegacyTweetContent(time: Double, message: String) extends  TweetContent {
+case class LegacyTweetContent(time: Double, message: String, starNames: List[String]) extends  TweetContent {
   def hashtags: List[String] = Nil;
-  def starNames: List[String] = Nil;
 }
 
 case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[TweetContent],
@@ -1858,7 +1868,11 @@ def putTweet(tc: TweetContent): Unit = {
 }
 
 def putTweet(time: Double, msg: String): Unit = {
-  putTweet(LegacyTweetContent(time, msg));
+  putTweet(LegacyTweetContent(time, msg, Nil));
+}
+
+def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
+  putTweet(LegacyTweetContent(time, msg, starNames));
 }
 
 //==============================================================================
@@ -2820,9 +2834,9 @@ tweetMoonRiseSet();
 
 {
   import Ordering.Double.IeeeOrdering;
-  case class StarTweetContent(time: Double, message: String, hashtags2: List[String]) extends TweetContent {
+  case class StarTweetContent(time: Double, message: String,
+    hashtags2: List[String], starNames: List[String]) extends TweetContent {
     def hashtags: List[String] = hashtags2 ::: "星空" :: "星座" :: Nil;
-    def starNames: List[String] = Nil;
   }
 
   // この時期21時ごろ見えやすい星座
@@ -2841,8 +2855,9 @@ tweetMoonRiseSet();
       }
     }
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
+    val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見えやすい星座は、%sです #星空 #星座".format(constellationsStr);
-    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
   // この時期21時ごろ見える南の空低い星座
@@ -2866,8 +2881,9 @@ tweetMoonRiseSet();
     }
     if (constellations.nonEmpty) {
       val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
+      val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ南の低い空に見える星座は、%sです #星空 #星座".format(constellationsStr);
-      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
     }
   }
 
@@ -2897,8 +2913,9 @@ tweetMoonRiseSet();
       }
     }).toIndexedSeq;
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
+    val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見える明るい星は、%sです #星空".format(constellationsStr);
-    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
   // この時期21時ごろ見えやすい黄道十二星座
@@ -2921,8 +2938,9 @@ tweetMoonRiseSet();
       val constellationsStr = constellations.sortBy(-_._2).map { case (aziAltStr, azi, name) =>
         "%s(%s)".format(name, aziAltStr);
       }.mkString("、");
+      val starNames = constellations.sortBy(-_._2).map(_._3).toList;
       val msg = "この時期21時ごろ見えやすい黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
-      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
     }
   }
 
@@ -2946,8 +2964,9 @@ tweetMoonRiseSet();
     }
     if (constellations.nonEmpty) {
       val constellationsStr = constellations.sortBy(_._1).map(_._2).mkString("、");
+      val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
-      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg);
+      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
     }
   }
 
@@ -2985,7 +3004,9 @@ tweetMoonRiseSet();
           } else {
             culminationContents(index)._2 + "。月明かりなし";
           }
-          putTweet(StarTweetContent(time0, msg, culminationContents(index)._3));
+          val hashtags = culminationContents(index)._3;
+          val starNames = culminationContents(index)._4;
+          putTweet(StarTweetContent(time0, msg, hashtags, starNames));
           index += 1;
           if (index == culminationContents.size) {
             index = 0;
@@ -3020,7 +3041,9 @@ tweetMoonRiseSet();
           }
           day1 = if (p < 0) day1 else day1 + p;
         }
-        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, lunchTimeContents(index)._3));
+        val hashtags = lunchTimeContents(index)._3;
+        val starNames = Nil;
+        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, hashtags, starNames));
         index += 1;
         if (index == lunchTimeContents.size) {
           index = 0;
