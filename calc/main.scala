@@ -3152,35 +3152,30 @@ tweetMoonRiseSet();
     }
   }
 
-  {
-    def isTweet(day: Int): Boolean = {
-      val altHor = -0.90 / PI57;
-      val time = startTime + day + 21.0 / 24;
-      val time1 = startTime + day + 24.0 / 24;
-      if (calcPlanetXyzAziAlt(time, JplData.Moon)._3 < altHor && calcPlanetXyzAziAlt(time1, JplData.Moon)._3 < altHor) {
-        if (!getTweets(time).tweets.map(_.time).exists(isLunchTime)) {
-          true;
-        } else {
-          false;
-        }
-      } else {
-        false;
-      }
-    }
-    var day: Int = 90; // PERIOD
-    while (day < period) {
-      while (!isTweet(day)) { day += 1; }; putTweetConstellations21(day);
-      while (!isTweet(day)) { day += 1; }; putTweetConstellationsSouth(day);
-      while (!isTweet(day)) { day += 1; }; putTweetBrightStars(day);
-      while (!isTweet(day)) { day += 1; }; putTweetConstellationsGalaxy(day);
-      while (!isTweet(day)) { day += 1; }; putTweetConstellationsEcliptical(day);
-    }
-  }
-
   putTweetCulminations();
   putTweetLunchTimeContents();
 
+  var kind: Int = 0;
+  var nextDay: Int = 90; // PERIOD
   (90 until period).foreach { day => // PERIOD
+    if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+      if (day >= nextDay) {
+        if (kind == 0) {
+          putTweetConstellations21(day);
+        } else if (kind == 1) {
+          putTweetConstellationsSouth(day);
+        } else if (kind == 2) {
+          putTweetBrightStars(day);
+        } else if (kind == 3) {
+          putTweetConstellationsGalaxy(day);
+        } else {
+          putTweetConstellationsEcliptical(day);
+          kind = -1;
+        }
+        kind += 1;
+        nextDay = day + 3;
+      }
+    }
     Words.putTweetWord(day);
   }
 }
