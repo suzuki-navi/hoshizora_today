@@ -1100,14 +1100,9 @@ class Words(constellationData: Constellations) {
   private def findRecentWord(day: Int): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
     val time = startTime + day + 12.0 / 24;
     val lastTweets = {
-      (
-        getTweets(startTime + day - 3).tweets :::
-        getTweets(startTime + day - 2).tweets :::
-        getTweets(startTime + day - 1).tweets :::
-        getTweets(startTime + day).tweets
-      ).filter { t =>
+      (-7 to 0).flatMap(i => getTweets(startTime + day + i).tweets).filter { t =>
         val d = t.time - time;
-        (d >= -3.1 && d < 0.0);
+        (d >= -7.1 && d < 0.0);
       }
     }
     val lst = lastTweets.flatMap(_.starNames);
@@ -3008,7 +3003,7 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見える南の空低い星座
-  def putTweetConstellationsSouth(day: Int): Unit = {
+  def putTweetConstellationsSouth(day: Int): Boolean = {
     val decThres = - PI5 + tokyoLat + 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
@@ -3031,6 +3026,9 @@ tweetMoonRiseSet();
       val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ南の低い空に見える星座は、%sです #星空 #星座".format(constellationsStr);
       putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      true;
+    } else {
+      false;
     }
   }
 
@@ -3066,7 +3064,7 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見えやすい黄道十二星座
-  def putTweetConstellationsEcliptical(day: Int): Unit = {
+  def putTweetConstellationsEcliptical(day: Int): Boolean = {
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
@@ -3088,11 +3086,14 @@ tweetMoonRiseSet();
       val starNames = constellations.sortBy(-_._2).map(_._3).toList;
       val msg = "この時期21時ごろ見えやすい黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
       putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      true;
+    } else {
+      false;
     }
   }
 
   // この時期21時ごろ見える天の川
-  def putTweetConstellationsGalaxy(day: Int): Unit = {
+  def putTweetConstellationsGalaxy(day: Int): Boolean = {
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
@@ -3114,6 +3115,9 @@ tweetMoonRiseSet();
       val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
       putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      true;
+    } else {
+      false;
     }
   }
 
@@ -3202,46 +3206,43 @@ tweetMoonRiseSet();
   }
 
   putTweetCulminations();
+
+  (90 until period).foreach { day => // PERIOD
+    val wday = TimeLib.wday(startTime + day);
+    var kind: Int = 0;
+    if (wday == 1) { // 月曜
+      if ((startTime + day).toInt % 2 == 0) {
+        putTweetConstellations21(day);
+      } else {
+        var i: Int = 0;
+        var f = false;
+        while (!f && i < 3) {
+          if (kind == 0) {
+            f = putTweetConstellationsGalaxy(day);
+            kind = 1;
+          } else if (kind == 1) {
+            f = putTweetConstellationsEcliptical(day);
+            kind = 2;
+          } else if (kind == 2) {
+            f = putTweetConstellationsSouth(day);
+            kind = 0;
+          }
+          i += 1;
+        }
+      }
+    } else if (wday == 3) { // 水曜
+      if ((startTime + day).toInt % 2 == 1) {
+        putTweetBrightStars(day);
+      }
+    }
+  }
+
   putTweetLunchTimeContents();
 
-  var day: Int = 90; // PERIOD
-  var nextDay: Int = 90; // PERIOD
-  var kind: Int = 0;
-  while (day < period) {
+  (90 until period).foreach { day => // PERIOD
     if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       words.putTweetWord(day);
     }
-
-    if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime) && day >= nextDay) {
-      if (kind == 0) {
-        putTweetConstellations21(day);
-        nextDay = day + 2;
-      } else if (kind == 1) {
-        putTweetConstellationsSouth(day);
-        nextDay = day + 2;
-      } else if (kind == 2) {
-        putTweetBrightStars(day);
-        nextDay = day + 1;
-      } else if (kind == 3) {
-        putTweetConstellationsGalaxy(day);
-        if (getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
-          nextDay = day + 2;
-        } else {
-          day -= 1;
-        }
-      } else {
-        putTweetConstellationsEcliptical(day);
-        if (getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
-          nextDay = day + 2;
-        } else {
-          day -= 1;
-        }
-        kind = -1;
-      }
-      kind += 1;
-    }
-
-    day += 1;
   }
 }
 
