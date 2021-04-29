@@ -882,13 +882,31 @@ object Constellations {
   case class Constellation (ra: Double, dec: Double, xyz: Array[Double], name: String, hashtags: List[String],
     eclipticalFlag: Boolean, galaxyFlag: Boolean);
 
+  def siderealTimeToConstellation(siderealTime: Double, data: IndexedSeq[(String, String)]): String = {
+    val lng5 = (siderealTime * PI57 / 5).toInt * 5;
+    val key = "%02dh%02dm".format(lng5 / 15, lng5 % 15 * 4);
+    val p = data.indexWhere(_._1 > key) - 1;
+    val cons = if (p == -1) {
+      data(data.size - 2)._2;
+    } else if (p >= 0) {
+      data(p)._2;
+    } else {
+      throw new Exception();
+    }
+    cons;
+  }
+
+}
+
+class Constellations {
+
   val (culminationContents, lunchTimeContents, lunchTimeContents2, constellationData, starData, constellationsMap) = {
     import Ordering.Double.IeeeOrdering;
     val source = scala.io.Source.fromFile(constellationsDataPath);
     var culminationContents: List[(Double, String, List[String], List[String])] = Nil;
     var lunchTimeContents:   List[(Double, String, List[String])] = Nil;
     var lunchTimeContents2:   List[Words.ConstellationLunchTimeContent] = Nil;
-    var constellationData: List[Constellation] = Nil;
+    var constellationData: List[Constellations.Constellation] = Nil;
     var starData: List[(Double, Array[Double], String, List[String])] = Nil;
     var constellationsMap: Map[String, (String, List[String])] = Map.empty;
     source.getLines.foreach { line =>
@@ -940,7 +958,7 @@ object Constellations {
             val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
             val eclipticalFlag = eclipticalStr != null;
             val galaxyFlag = galaxyStr != null;
-            constellationData = Constellation(ra, dec, xyz, content, hashtags,
+            constellationData = Constellations.Constellation(ra, dec, xyz, content, hashtags,
               eclipticalFlag, galaxyFlag) :: constellationData;
           case StarsPattern(decStr, content) =>
             val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
@@ -995,20 +1013,6 @@ object Constellations {
     icrsToConstellation(lng, lat);
   }
 
-  def siderealTimeToConstellation(siderealTime: Double, data: IndexedSeq[(String, String)]): String = {
-    val lng5 = (siderealTime * PI57 / 5).toInt * 5;
-    val key = "%02dh%02dm".format(lng5 / 15, lng5 % 15 * 4);
-    val p = data.indexWhere(_._1 > key) - 1;
-    val cons = if (p == -1) {
-      data(data.size - 2)._2;
-    } else if (p >= 0) {
-      data(p)._2;
-    } else {
-      throw new Exception();
-    }
-    cons;
-  }
-
 }
 
 object Words {
@@ -1022,29 +1026,60 @@ object Words {
   case class ConstellationLunchTimeContent (word: String, contentTemplate: String, hashtags: List[String],
     ra: Double, dec: Double, xyz: Array[Double]) extends LunchTimeContent {
     def content(day: Int): String = {
-      if (contentTemplate.endsWith("%")) {
-        val time = startTime + day + 21.0 / 24;
-        val tdb = TimeLib.mjdutcToTdb(time);
-        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-        val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
-        val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
-        val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
-        "%sこの時期21時ごろ%sにいます".format(contentTemplate.substring(0, contentTemplate.length - 1), hcsStr);
+      val time = startTime + day + 21.0 / 24;
+      val tdb = TimeLib.mjdutcToTdb(time);
+      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+      val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
+      val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
+      replaceSouthPattern(contentTemplate, hcsStr);
+    }
+
+    private[this] def replaceSouthPattern(template: String, hcsStr: String): String = {
+      val template2 = if (hcsStr.startsWith("南の")) {
+        template.replace("[", "(").replace("]", ")");
       } else {
-        contentTemplate;
+        var f: Boolean = true;
+        var template2 = template;
+        while (f) {
+          f = false;
+          val p1 = template2.indexOf("[");
+          if (p1 >= 0) {
+            val p2 = template2.indexOf("]", p1);
+            if (p2 > p1) {
+              template2 = template2.substring(0, p1) + template2.substring(p2 + 1);
+              f = true;
+            }
+          }
+        }
+        template2;
+      }
+      if (template2.indexOf("%") >= 0) {
+        template2.replace("%", "この時期21時ごろ%sにいます".format(hcsStr));
+      } else {
+        template2;
       }
     }
   }
 
-  private def getLunchTimeContents(word: String): IndexedSeq[LunchTimeContent] = {
-    Constellations.lunchTimeContents2.filter(_.word == word);
+}
+
+class Words(constellationData: Constellations) {
+
+  private def fetchLunchTimeContents(word: String): IndexedSeq[Words.LunchTimeContent] = {
+    constellationData.lunchTimeContents2.filter(_.word == word);
   }
 
   private val defaultLimit = 28;
   private var tweetedDays: Map[String, (List[Int], Int)] = Map.empty;
+  private var contents: Map[String, IndexedSeq[Words.LunchTimeContent]] = Map.empty;
 
-  private def tweetPoint(word: String, day: Int): (IndexedSeq[LunchTimeContent], Double) = {
-    val cs = getLunchTimeContents(word);
+  private def tweetPoint(word: String, day: Int): (IndexedSeq[Words.LunchTimeContent], Double) = {
+    val cs = contents.getOrElse(word, {
+      val cs = fetchLunchTimeContents(word);
+      contents = contents + (word -> cs);
+      cs;
+    });
     if (cs.isEmpty) {
       (IndexedSeq.empty, 0.0);
     } else {
@@ -1062,7 +1097,7 @@ object Words {
     }
   }
 
-  private def findRecentWord(day: Int): Option[(String, IndexedSeq[LunchTimeContent])] = {
+  private def findRecentWord(day: Int): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
     val time = startTime + day + 12.0 / 24;
     val lastTweets = {
       (
@@ -1095,22 +1130,20 @@ object Words {
   }
 
   def putTweetWord(day: Int): Unit = {
-    val time1 = startTime + day + (12.0 + 50.0 / 60) / 24;
-    if (!getTweets(time1).tweets.map(_.time).exists(isLunchTime)) {
-      findRecentWord(day) match {
-        case None => ;
-        case Some((word, contents)) =>
-          var inc: Int = 0;
-          contents.foreach { content =>
-            val msg = content.content(day + inc) + content.hashtags.map(" #" + _).mkString("");
-            putTweet(time1 + inc, msg);
-            addHistory(word, day + inc);
+    findRecentWord(day) match {
+      case None => ;
+      case Some((word, contents)) =>
+        val time1 = startTime + day + (12.0 + 50.0 / 60) / 24;
+        var inc: Int = 0;
+        contents.foreach { content =>
+          val msg = content.content(day + inc) + content.hashtags.map(" #" + _).mkString("");
+          putTweet(time1 + inc, msg);
+          addHistory(word, day + inc);
+          inc += 1;
+          while (getTweets(startTime + day + inc).tweets.map(_.time).exists(isLunchTime)) {
             inc += 1;
-            while (getTweets(startTime + day + inc).tweets.map(_.time).exists(isLunchTime)) {
-              inc += 1;
-            }
           }
-      }
+        }
     }
   }
 
@@ -1567,6 +1600,8 @@ object Lib2 {
 
 val jplData = new JplData(jplDataPath);
 val hcs = new Hcs(tokyoLng, tokyoLat);
+val constellationData = new Constellations();
+val words = new Words(constellationData);
 
 //==============================================================================
 // イベント計算
@@ -2169,7 +2204,7 @@ def calcSunLng2(time: Double): Double = {
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres0) {
-        val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
+        val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
         Some((cons, hashtags));
       } else {
         None;
@@ -2350,7 +2385,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     case None =>
       putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
     case Some(xyz) =>
-      val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
+      val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
       putTweet(time2, "%sが%s。%sにいます #%s".format(planetName, content, cons, planetName) +
         hashtags.map(" #" + _).mkString);
     }
@@ -2838,7 +2873,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       } match {
         case None => ;
         case Some((time, xyz, azi, alt)) =>
-          val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
+          val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
           val moonPhase = calcMoonPhase(time);
           val moonStr: String = {
             val s = moonPhaseNaturalString(moonPhase);
@@ -2893,7 +2928,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         } match {
           case None => ;
           case Some((time, xyz, azi, alt)) =>
-            val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
+            val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
             val moonPhase = calcMoonPhase(time);
             val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
             putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
@@ -2957,7 +2992,7 @@ tweetMoonRiseSet();
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = Constellations.constellationData.flatMap { constellation =>
+    val constellations = constellationData.constellationData.flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres) {
@@ -2978,7 +3013,7 @@ tweetMoonRiseSet();
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = Constellations.constellationData.flatMap { constellation =>
+    val constellations = constellationData.constellationData.flatMap { constellation =>
       if (constellation.dec < decThres) {
         val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
         val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -3006,7 +3041,7 @@ tweetMoonRiseSet();
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = (Constellations.starData.flatMap { case (ra, xyz, name, hashtags) =>
+    val constellations = (constellationData.starData.flatMap { case (ra, xyz, name, hashtags) =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres) {
@@ -3036,7 +3071,7 @@ tweetMoonRiseSet();
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = Constellations.constellationData.filter(_.eclipticalFlag).flatMap { constellation =>
+    val constellations = constellationData.constellationData.filter(_.eclipticalFlag).flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres) {
@@ -3062,7 +3097,7 @@ tweetMoonRiseSet();
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = Constellations.constellationData.filter(_.galaxyFlag).flatMap { constellation =>
+    val constellations = constellationData.constellationData.filter(_.galaxyFlag).flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres) {
@@ -3086,7 +3121,7 @@ tweetMoonRiseSet();
   def putTweetCulminations(): Unit = {
     val altHor = -0.90 / PI57;
     var index: Int = -1;
-    val culminationContents = Constellations.culminationContents;
+    val culminationContents = constellationData.culminationContents;
     (73 until period).foreach { day => // PERIOD
       if (index < 0) {
         val time = startTime + day + 21.0 / 24.0; // PERIOD
@@ -3130,7 +3165,7 @@ tweetMoonRiseSet();
 
   // 星座の解説など
   def putTweetLunchTimeContents(): Unit = {
-    val lunchTimeContents = Constellations.lunchTimeContents;
+    val lunchTimeContents = constellationData.lunchTimeContents;
     var day1: Int = 62; // PERIOD
     var day2: Int = 62; // PERIOD
     var index: Int = {
@@ -3172,7 +3207,9 @@ tweetMoonRiseSet();
   var kind: Int = 0;
   var nextDay: Int = 90; // PERIOD
   (90 until period).foreach { day => // PERIOD
-    Words.putTweetWord(day);
+    if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+      words.putTweetWord(day);
+    }
 
     if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       if (day >= nextDay) {
