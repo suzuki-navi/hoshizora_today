@@ -1062,29 +1062,44 @@ object Words {
     }
   }
 
+  private def findRecentWord(day: Int): Option[(String, IndexedSeq[LunchTimeContent])] = {
+    val time = startTime + day + 12.0 / 24;
+    val lastTweets = {
+      (
+        getTweets(startTime + day - 3).tweets :::
+        getTweets(startTime + day - 2).tweets :::
+        getTweets(startTime + day - 1).tweets :::
+        getTweets(startTime + day).tweets
+      ).filter { t =>
+        val d = t.time - time;
+        (d >= -3.1 && d < 0.0);
+      }
+    }
+    val lst = lastTweets.flatMap(_.starNames);
+    if (lst.nonEmpty) {
+      import Ordering.Double.IeeeOrdering;
+      val (word, (contents, point)) = lst.map { w => (w, tweetPoint(w, day)) }.sortBy(- _._2._2).head;
+      if (point >= 1.0) {
+        Some((word, contents));
+      } else {
+        None;
+      }
+    } else {
+      None;
+    }
+  }
+
   private def addHistory(word: String, day: Int): Unit = {
     val (days, limit) = tweetedDays.getOrElse(word, (Nil, defaultLimit));
     tweetedDays = tweetedDays + (word -> (day :: days, limit));
   }
 
   def putTweetWord(day: Int): Unit = {
-    import Ordering.Double.IeeeOrdering;
-    val time1 = startTime + day + (12.0 + 5.0 / 60) / 24;
+    val time1 = startTime + day + (12.0 + 50.0 / 60) / 24;
     if (!getTweets(time1).tweets.map(_.time).exists(isLunchTime)) {
-      val lastTweets = {
-        (
-          getTweets(startTime + day - 2).tweets :::
-          getTweets(startTime + day - 1).tweets :::
-          getTweets(startTime + day).tweets
-        ).filter { t =>
-          val d = t.time - time1;
-          (d >= -2.1 && d < 0.0);
-        }
-      }
-      val lst = lastTweets.flatMap(_.starNames);
-      if (lst.nonEmpty) {
-        val (word, (contents, point)) = lst.map { w => (w, tweetPoint(w, day)) }.sortBy(- _._2._2).head;
-        if (point >= 1.0) {
+      findRecentWord(day) match {
+        case None => ;
+        case Some((word, contents)) =>
           var inc: Int = 0;
           contents.foreach { content =>
             val msg = content.content(day + inc) + content.hashtags.map(" #" + _).mkString("");
@@ -1095,7 +1110,6 @@ object Words {
               inc += 1;
             }
           }
-        }
       }
     }
   }
@@ -3158,6 +3172,8 @@ tweetMoonRiseSet();
   var kind: Int = 0;
   var nextDay: Int = 90; // PERIOD
   (90 until period).foreach { day => // PERIOD
+    Words.putTweetWord(day);
+
     if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       if (day >= nextDay) {
         if (kind == 0) {
@@ -3173,10 +3189,9 @@ tweetMoonRiseSet();
           kind = -1;
         }
         kind += 1;
-        nextDay = day + 3;
+        nextDay = day + 2;
       }
     }
-    Words.putTweetWord(day);
   }
 }
 
