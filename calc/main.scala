@@ -3204,31 +3204,44 @@ tweetMoonRiseSet();
   putTweetCulminations();
   putTweetLunchTimeContents();
 
-  var kind: Int = 0;
+  var day: Int = 90; // PERIOD
   var nextDay: Int = 90; // PERIOD
-  (90 until period).foreach { day => // PERIOD
+  var kind: Int = 0;
+  while (day < period) {
     if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       words.putTweetWord(day);
     }
 
-    if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
-      if (day >= nextDay) {
-        if (kind == 0) {
-          putTweetConstellations21(day);
-        } else if (kind == 1) {
-          putTweetConstellationsSouth(day);
-        } else if (kind == 2) {
-          putTweetBrightStars(day);
-        } else if (kind == 3) {
-          putTweetConstellationsGalaxy(day);
-        } else {
-          putTweetConstellationsEcliptical(day);
-          kind = -1;
-        }
-        kind += 1;
+    if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime) && day >= nextDay) {
+      if (kind == 0) {
+        putTweetConstellations21(day);
         nextDay = day + 2;
+      } else if (kind == 1) {
+        putTweetConstellationsSouth(day);
+        nextDay = day + 2;
+      } else if (kind == 2) {
+        putTweetBrightStars(day);
+        nextDay = day + 1;
+      } else if (kind == 3) {
+        putTweetConstellationsGalaxy(day);
+        if (getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+          nextDay = day + 2;
+        } else {
+          day -= 1;
+        }
+      } else {
+        putTweetConstellationsEcliptical(day);
+        if (getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+          nextDay = day + 2;
+        } else {
+          day -= 1;
+        }
+        kind = -1;
       }
+      kind += 1;
     }
+
+    day += 1;
   }
 }
 
