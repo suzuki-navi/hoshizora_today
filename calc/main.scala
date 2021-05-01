@@ -12,6 +12,8 @@ val constellationsDataPath = "constellations.txt";
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
 
+val wordHistoryPath = "../etc/word-history.txt";
+
 val PI = Math.PI;
 val PI2 = Math.PI * 2.0;
 val PI2R = 1.0 / PI2;
@@ -218,18 +220,23 @@ object TimeLib {
     java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0).toLong).toString;
   }
 
-  def modifiedJulianDayToStringJST(time: Double): String = {
+  def dateStringToDay(str: String): Int = {
+    (stringToModifiedJulianDay(str + "T00:00:00Z") - startTime).toInt;
+  }
+
+  // 2021-04-01
+  def timeToDateString(time: Double): String = {
+    java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString.substring(0, 10);
+  }
+
+  // 2021-04-01T12:00
+  def timeToDateTimeString(time: Double): String = {
     java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString.substring(0, 16);
   }
 
   def modifiedJulianDayToStringJSTNaturalTime(time: Double): String = {
     val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
     "%s時%s分".format(str.substring(11, 13), str.substring(14, 16));
-  }
-
-  def modifiedJulianDayToStringJSTDate(time: Double): String = {
-    val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
-    str.substring(0, 10);
   }
 
   def wday(time: Double): Int = {
@@ -1071,8 +1078,46 @@ class Words(constellationData: Constellations) {
   }
 
   private val defaultLimit = 28;
-  private var tweetedDays: Map[String, (List[Int], Int)] = Map.empty;
+  private var history: Map[String, (List[Int], Int)] = Map.empty;
   private var contents: Map[String, IndexedSeq[Words.LunchTimeContent]] = Map.empty;
+
+  val periodStart: Int = 90; // PERIOD
+
+  def loadHistory(path: String): Unit = {
+    history = Map.empty;
+    val source = scala.io.Source.fromFile(path);
+    source.getLines.foreach { line =>
+      val cols = line.split(":");
+      val word = cols(0);
+      val (days, limit) = history.getOrElse(word, (Nil, defaultLimit));
+      if (cols(1).startsWith("limit ")) {
+        val limit = cols(1).substring(6).toInt;
+        history = history + (word -> (days, limit));
+      } else {
+        val day = TimeLib.dateStringToDay(cols(1));
+        if (day < periodStart) {
+          history = history + (word -> (day :: days, limit));
+        }
+      }
+    }
+    source.close();
+  }
+
+  def saveHistory(path: String): Unit = {
+    scala.util.Using(new java.io.PrintWriter(new java.io.FileOutputStream(path))) { writer =>
+      history.keySet.toSeq.sorted.foreach { word =>
+        val (days, limit) = history(word);
+        {
+          val line = "%s:limit %d".format(word, limit);
+          writer.println(line);
+        }
+        days.reverse.foreach { day =>
+          val line = "%s:%s".format(word, TimeLib.timeToDateString(startTime + day));
+          writer.println(line);
+        }
+      }
+    }
+  }
 
   private def tweetPoint(word: String, day: Int): (IndexedSeq[Words.LunchTimeContent], Double) = {
     val cs = contents.getOrElse(word, {
@@ -1083,7 +1128,7 @@ class Words(constellationData: Constellations) {
     if (cs.isEmpty) {
       (IndexedSeq.empty, 0.0);
     } else {
-      val (days, limit) = tweetedDays.getOrElse(word, (Nil, defaultLimit));
+      val (days, limit) = history.getOrElse(word, (Nil, defaultLimit));
       if (days.isEmpty) {
         (cs, 10000.0);
       } else {
@@ -1120,8 +1165,8 @@ class Words(constellationData: Constellations) {
   }
 
   private def addHistory(word: String, day: Int): Unit = {
-    val (days, limit) = tweetedDays.getOrElse(word, (Nil, defaultLimit));
-    tweetedDays = tweetedDays + (word -> (day :: days, limit));
+    val (days, limit) = history.getOrElse(word, (Nil, defaultLimit));
+    history = history + (word -> (day :: days, limit));
   }
 
   def putTweetWord(day: Int): Unit = {
@@ -1597,6 +1642,7 @@ val jplData = new JplData(jplDataPath);
 val hcs = new Hcs(tokyoLng, tokyoLat);
 val constellationData = new Constellations();
 val words = new Words(constellationData);
+words.loadHistory(wordHistoryPath);
 
 //==============================================================================
 // イベント計算
@@ -1954,7 +2000,7 @@ sealed trait TweetContent {
   def hashtags: List[String];
   def starNames: List[String];
 
-  def date: String = TimeLib.modifiedJulianDayToStringJSTDate(time);
+  def date: String = TimeLib.timeToDateString(time);
 }
 
 case class LegacyTweetContent(time: Double, message: String, starNames: List[String]) extends  TweetContent {
@@ -1992,17 +2038,17 @@ case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[Tweet
 }
 
 var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
-  val date = TimeLib.modifiedJulianDayToStringJSTDate(startTime + day);
+  val date = TimeLib.timeToDateString(startTime + day);
   (date, DateTweets(Nil, Nil, Nil, Nil));
 }.toMap;
 
 def getTweets(time: Double): DateTweets = {
-  val date = TimeLib.modifiedJulianDayToStringJSTDate(time);
+  val date = TimeLib.timeToDateString(time);
   _tweets.getOrElse(date, DateTweets(Nil, Nil, Nil, Nil));
 }
 
 def putTweet(tc: TweetContent): Unit = {
-  val date = TimeLib.modifiedJulianDayToStringJSTDate(tc.time);
+  val date = TimeLib.timeToDateString(tc.time);
   if (_tweets.contains(date)) {
     val tw = _tweets(date);
     _tweets = _tweets.updated(date, tw.added(tc));
@@ -2022,8 +2068,8 @@ def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
 //==============================================================================
 
 {
-  val yearStart = TimeLib.modifiedJulianDayToStringJST(startTime).substring(0, 4).toInt;
-  val yearEnd = TimeLib.modifiedJulianDayToStringJST(endTime).substring(0, 4).toInt;
+  val yearStart = TimeLib.timeToDateTimeString(startTime).substring(0, 4).toInt;
+  val yearEnd = TimeLib.timeToDateTimeString(endTime).substring(0, 4).toInt;
   val source = scala.io.Source.fromFile(holidayDataPath);
   source.getLines.foreach { line =>
     if (line != "" && !line.startsWith("#")) {
@@ -3239,7 +3285,7 @@ tweetMoonRiseSet();
 
   putTweetLunchTimeContents();
 
-  (90 until period).foreach { day => // PERIOD
+  (words.periodStart until period).foreach { day =>
     if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       words.putTweetWord(day);
     }
@@ -3269,14 +3315,16 @@ tweetMoonRiseSet();
     if (time >= startTime && time < endTime) {
       val msg = tc.message + tc.hashtags.map(" #" + _).mkString;
       if (msg.indexOf("ERROR") >= 0) {
-        println("%s #%s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
+        println("%s #%s".format(TimeLib.timeToDateTimeString(time), msg));
       } else if (msg.length > 140) {
-        println("%s #TOO_LONG(%d) %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg.length, msg));
+        println("%s #TOO_LONG(%d) %s".format(TimeLib.timeToDateTimeString(time), msg.length, msg));
       } else {
-        println("%s %s".format(TimeLib.modifiedJulianDayToStringJST(time), msg));
+        println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
       }
     }
   }
 }
+
+words.saveHistory(wordHistoryPath);
 
 //==============================================================================
