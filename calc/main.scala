@@ -907,7 +907,7 @@ object Constellations {
 
 class Constellations {
 
-  val (culminationContents, lunchTimeContents, lunchTimeContents2, constellationData, starData, constellationsMap) = {
+  val (culminationContents, lunchTimeContents, lunchTimeContents2, constellationData, starData, starData2, constellationsMap) = {
     import Ordering.Double.IeeeOrdering;
     val source = scala.io.Source.fromFile(constellationsDataPath);
     var culminationContents: List[(Double, String, List[String], List[String])] = Nil;
@@ -915,6 +915,7 @@ class Constellations {
     var lunchTimeContents2:   List[Words.ConstellationLunchTimeContent] = Nil;
     var constellationData: List[Constellations.Constellation] = Nil;
     var starData: List[(Double, Array[Double], String, List[String])] = Nil;
+    var starData2: List[(Double, Array[Double], Double, String, List[String])] = Nil;
     var constellationsMap: Map[String, (String, List[String])] = Map.empty;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
@@ -955,6 +956,7 @@ class Constellations {
           (ra, dec, xyz);
         }
         val ConstellationPattern = "([-+.0-9]+)\\s+Constellation\\s+(Ecliptical\\s+)?(Galaxy\\s+)?(.+)".r;
+        val StarsPattern2 = "([-+.0-9]+)\\s+Stars\\s+Bright\\s+([-+.0-9]+)\\s+(.+)".r;
         val StarsPattern = "([-+.0-9]+)\\s+Stars\\s+Bright\\s+(.+)".r;
         val CulminationPattern = "Cul\\s+(.+)".r;
         val LunchTimeContentPattern = "Lunch\\s+(.+)".r;
@@ -967,6 +969,11 @@ class Constellations {
             val galaxyFlag = galaxyStr != null;
             constellationData = Constellations.Constellation(ra, dec, xyz, content, hashtags,
               eclipticalFlag, galaxyFlag) :: constellationData;
+          case StarsPattern2(decStr, magStr, content) =>
+            val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
+            val mag = magStr.toDouble;
+            starData = (ra, xyz, content, hashtags) :: starData;
+            starData2 = (ra, xyz, mag, content, hashtags) :: starData2;
           case StarsPattern(decStr, content) =>
             val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
             starData = (ra, xyz, content, hashtags) :: starData;
@@ -998,6 +1005,7 @@ class Constellations {
       lunchTimeContents2.reverse.toIndexedSeq.sortBy(_.ra),
       constellationData.reverse.toIndexedSeq.sortBy(_.ra),
       starData.reverse.toIndexedSeq.sortBy(_._1),
+      starData2.reverse.toIndexedSeq.sortBy(_._1),
       constellationsMap,
     );
   }
@@ -2580,6 +2588,13 @@ case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent 
   def starNames: List[String] = Nil;
 }
 
+case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[String]) extends OnSunsetTweetContent {
+  def message: String = "#" + msg;
+  def message2: String = message;
+  def message3: String = message;
+  def hashtags: List[String] = Nil;
+}
+
 // 日没時最大高度
 {
   val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
@@ -3079,7 +3094,7 @@ tweetMoonRiseSet();
   }
 
   // この時期21時ごろ見える明るい星
-  def putTweetBrightStars(day: Int): Unit = {
+  def putTweetBrightStars21(day: Int): Unit = {
     val altThres = 10.0 / PI57;
     //val altThres = 0.0;
     val time = startTime + day + 21.0 / 24;
@@ -3107,6 +3122,49 @@ tweetMoonRiseSet();
     val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見える明るい星は、%sです #星空".format(constellationsStr);
     putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+  }
+
+  // この時期日没時の一番星候補となる明るい星
+  def putTweetBrightStarsSunset(day: Int): Unit = {
+    val altThres = 10.0 / PI57;
+    val altThres3 = 30.0 / PI57;
+    //val altThres = 0.0;
+    val time = sunsetTimes(day);
+    val tdb = TimeLib.mjdutcToTdb(time);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val constellations0 = (constellationData.starData2.flatMap { case (ra, xyz, magnitude, name, hashtags) =>
+      val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
+      val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
+      val aziAltStr = Hcs.aziAltToNaturalString(azi, alt);
+      if (alt >= altThres) {
+        Some((azi, alt, name, aziAltStr, magnitude));
+      } else {
+        None;
+      }
+    }) ++
+    (List(("水星", JplData.Mercury, -2.5), ("金星", JplData.Venus, -4.9), ("火星", JplData.Mars, -2.8), ("木星", JplData.Jupiter, -2.9), ("土星", JplData.Saturn, -0.6)).
+      flatMap { case (name, targetPlanet, magnitude) =>
+      val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
+      val aziAltStr = Hcs.aziAltToNaturalString(azi, alt);
+      if (alt >= altThres) {
+        Some((azi, alt, name, aziAltStr, magnitude));
+      } else {
+        None;
+      }
+    }).toIndexedSeq;
+    val constellations = (
+      constellations0.filter(_._2 >= altThres3).sortBy(_._5).take(3).toSet ++
+      constellations0.sortBy(_._5).take(3).toSet
+    ).toIndexedSeq;
+    if (constellations.nonEmpty) {
+      val constellationsStr = constellations.sortBy(-_._1).map { case (azi, alt, name, aziAltStr, magnitude) =>
+        "%s(%s)".format(name, aziAltStr);
+      }.mkString("、");
+      val starNames = constellations.sortBy(-_._1).map(_._3).toList;
+      val msg = "この時期日没時の一番星候補となる明るい星は、%sです".format(constellationsStr);
+      //putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      putTweet(SunsetFirstStarTweetContent(day, msg, starNames));
+    }
   }
 
   // この時期21時ごろ見えやすい黄道十二星座
@@ -3278,7 +3336,19 @@ tweetMoonRiseSet();
       }
     } else if (wday == 3) { // 水曜
       if ((startTime + day).toInt % 2 == 1) {
-        putTweetBrightStars(day);
+        putTweetBrightStars21(day);
+      }
+    } else if (wday == 5) { // 金曜
+      //if ((startTime + day).toInt % 2 == 1) {
+      //  putTweetBrightStarsSunset(day);
+      //}
+    }
+  }
+  (99 until period).foreach { day => // PERIOD
+    val wday = TimeLib.wday(startTime + day);
+    if (wday == 1) {
+      if (getTweets(startTime + day).sunsetTweets.isEmpty) {
+        putTweetBrightStarsSunset(day);
       }
     }
   }
