@@ -3412,8 +3412,12 @@ tweetMoonRiseSet();
     val time = startTime + day;
     if (getTweets(time).isEmpty) {
       putTweet(time, "#empty");
-    } else if (getTweets(time).daytimeTweets.isEmpty) {
-      putTweet(time, "#daytime empty");
+    } else {
+      if (getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
+        putTweet(time + 23.0 / 24, "#night empty");
+      } else if (getTweets(time).daytimeTweets.isEmpty) {
+        putTweet(time + 9.0 / 24, "#daytime empty");
+      }
     }
   }
 }
