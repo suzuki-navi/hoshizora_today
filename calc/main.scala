@@ -337,14 +337,21 @@ object TimeLib {
     //}
   }
 
+  private val gmstK = 1.0027379094;
+
   // UT1から平均恒星時に変換
   def mjdut1ToGmst(time: Double): Double = {
-    val r = 0.280191 + 1.0027379094 * (time - 59215.0);
+    val r = 0.280191 + gmstK * (time - 59215.0);
     PI2 * (if (r < 0) {
       r + 1 - r.toInt;
     } else {
       r - r.toInt;
     });
+  }
+
+  def gmstToMjdut1(sid: Double, time0: Double): Double = {
+    val d = MathLib.circleAdd(sid, -mjdut1ToGmst(time0));
+    time0 + d / PI2 / gmstK;
   }
 
 }
@@ -796,6 +803,20 @@ class Hcs(lng: Double, lat: Double) {
     }
   }
 
+  def siderealTimeToUtc(sid: Double, time0: Double): Double = {
+    siderealTimeToUt1(sid, time0); // 近似
+  }
+
+  def siderealTimeToUt1(sid: Double, time0: Double): Double = {
+    val s = sid - lng;
+    val s2 = if (s < 0) {
+      s + PI2;
+    } else {
+      s;
+    }
+    TimeLib.gmstToMjdut1(s2, time0);
+  }
+
   def trueEquatorialXyzToAziAltFromUtc(xyz: Array[Double], utc: Double): (Double, Double) = {
     val ut1 = utc; // 近似的
     trueEquatorialXyzToAziAltFromUt1(xyz, ut1);
@@ -1210,12 +1231,16 @@ object MathLib {
 
   def circleAdd(a: Double, b: Double): Double = {
     val d = a + b;
-    if (d > PI) {
+    if (d >= 3 * PI) {
+      d - 2 * PI2;
+    } else if (d >= PI) {
       d - PI2;
-    } else if (d > -PI) {
-      d;
-    } else {
+    } else if (d < -3 * PI) {
+      d + 2 * PI2;
+    } else if (d < -PI) {
       d + PI2;
+    } else {
+      d;
     }
   }
 
@@ -3247,23 +3272,23 @@ tweetMoonRiseSet();
     val altHor = -0.90 / PI57;
     var index: Int = -1;
     val culminationContents = constellationData.culminationContents;
-    (86 until period).foreach { day => // PERIOD
+    (87 until period).foreach { day => // PERIOD
       if (index < 0) {
-        val time = startTime + day + 21.0 / 24.0; // PERIOD
+        val time = startTime + day + 20.9 / 24.0; // PERIOD
         val sid = hcs.siderealTimeFromUtc(time);
         index = culminationContents.indexWhere(_._1 > sid);
         if (index < 0) {
           index = 0;
         }
       } else {
-        val time = startTime + day + 21.0 / 24.0;
-        val sid = hcs.siderealTimeFromUtc(time);
-        val time0 = if (MathLib.circleAdd(sid, -culminationContents(index)._1) >= 0) {
-          time;
-        } else if (getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
-          val sid2 = MathLib.circleAdd(sid, 2.0 * PI2 / 24);
-          if (MathLib.circleAdd(sid2, -culminationContents(index)._1) >= 0) {
-            time + MathLib.circleAdd(culminationContents(index)._1, -sid) / PI2;
+        val timeS = startTime + day + 21.0 / 24.0;
+        val timeE = startTime + day + 23.0 / 24.0;
+        val time1 = hcs.siderealTimeToUtc(culminationContents(index)._1, timeS);
+        val time0 = if (time1 < timeS) {
+          time1;
+        } else if (getTweets(timeS).tweets.map(_.time).filter(isNightTime3).isEmpty) {
+          if (time1 < timeE) {
+            time1;
           } else {
             0.0;
           }
