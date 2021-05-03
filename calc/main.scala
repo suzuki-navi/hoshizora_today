@@ -1211,15 +1211,14 @@ class Words(constellationData: Constellations) {
         val time1 = startTime + day + (12.0 + 50.0 / 60) / 24;
         var inc: Int = 0;
         contents.foreach { content =>
-          val c = content.content(day + inc);
+          val c = content.content(day + inc / 4);
           if (c != "") {
             val msg = c + content.hashtags.map(" #" + _).mkString("");
-            putTweet(time1 + inc, msg);
-            addHistory(word, day + inc);
-            inc += 1;
-            while (getTweets(startTime + day + inc).tweets.map(_.time).exists(isLunchTime)) {
-              inc += 1;
+            putTweet(time1 + 1.0 * (inc % 4) / 24, msg);
+            if (inc == 0) {
+              addHistory(word, day + inc / 4);
             }
+            inc += 1;
           }
         }
     }
