@@ -1971,7 +1971,7 @@ def isLunchTime(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
   //time - time.toInt >= 3.0 / 24 && time - time.toInt < 4.0 / 24; // 12時～13時
-  time - time.toInt >= 1.0 / 24 && time - time.toInt < 7.0 / 24;
+  time - time.toInt >= 1.0 / 24 && time - time.toInt < 7.0 / 24; // 10時～16時
 }
 
 def isNightTime0(time: Double): Boolean = {
@@ -3412,7 +3412,8 @@ tweetMoonRiseSet();
     if (getTweets(time).isEmpty) {
       putTweet(time, "#empty");
     } else {
-      if (getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
+      //if (getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
+      if (getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
         putTweet(time + 23.0 / 24, "#night empty");
       } else if (getTweets(time).daytimeTweets.isEmpty) {
         putTweet(time + 9.0 / 24, "#daytime empty");
