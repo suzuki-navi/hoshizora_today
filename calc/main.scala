@@ -356,6 +356,35 @@ object TimeLib {
 
 }
 
+object StringLib {
+  def parseContent(content: String): (String, Option[String], List[String], List[String]) = {
+    val UrlPattern = "(.+)\\s(https?://\\S+)".r;
+    val HashtagsPattern = "(.+)\\s+#(\\S+)".r;
+    val StarNamePattern = "(.+)\\s+\\$(\\S+)".r;
+    var content0 = content.trim;
+    var urlOpt: Option[String] = None;
+    var starNames: List[String] = Nil;
+    var hashtags: List[String] = Nil;
+    var f: Boolean = true;
+    while (f) {
+      content0 match {
+        case UrlPattern(c, s) =>
+          content0 = c;
+          urlOpt = Some(s);
+        case HashtagsPattern(c, s) =>
+          content0 = c;
+          hashtags = s :: hashtags;
+        case StarNamePattern(c, s) =>
+          content0 = c;
+          starNames = s :: starNames;
+        case _ =>
+          f = false;
+      }
+    }
+    (content0, urlOpt, hashtags.reverse, starNames.reverse);
+  }
+}
+
 object VectorLib {
 
   def minus(a: Array[Double], b: Array[Double]): Array[Double] = {
@@ -931,8 +960,8 @@ class Constellations {
   val (culminationContents, lunchTimeContents, lunchTimeContents2, constellationData, starData, starData2, constellationsMap) = {
     import Ordering.Double.IeeeOrdering;
     val source = scala.io.Source.fromFile(constellationsDataPath);
-    var culminationContents: List[(Double, String, List[String], List[String])] = Nil;
-    var lunchTimeContents:   List[(Double, String, List[String])] = Nil;
+    var culminationContents: List[(Double, String, Option[String], List[String], List[String])] = Nil;
+    var lunchTimeContents:   List[(Double, String, Option[String], List[String])] = Nil;
     var lunchTimeContents2:   List[Words.ConstellationLunchTimeContent] = Nil;
     var constellationData: List[Constellations.Constellation] = Nil;
     var starData: List[(Double, Array[Double], String, List[String])] = Nil;
@@ -941,28 +970,7 @@ class Constellations {
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
         val raStr = line.substring(0, 6);
-        val (content0: String, hashtags: List[String], starNames: List[String]) = {
-          var content0 = line.substring(7).trim;
-          var starNames: List[String] = Nil;
-          var hashtags: List[String] = Nil;
-          {
-            var p: Int = content0.lastIndexOf("$");
-            while (p >= 0) {
-              starNames = content0.substring(p + 1).trim :: starNames;
-              content0 = content0.substring(0, p).trim;
-              p = content0.lastIndexOf("$");
-            }
-          }
-          {
-            var p: Int = content0.lastIndexOf("#");
-            while (p >= 0) {
-              hashtags = content0.substring(p + 1).trim :: hashtags;
-              content0 = content0.substring(0, p).trim;
-              p = content0.lastIndexOf("#");
-            }
-          }
-          (content0, hashtags.reverse, starNames);
-        }
+        val (content0: String, urlOpt: Option[String], hashtags: List[String], starNames: List[String]) = StringLib.parseContent(line.substring(7));
         def calcRa(raStr: String): Double = {
           (raStr.substring(0, 2).toInt.toDouble + raStr.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
         }
@@ -1000,15 +1008,15 @@ class Constellations {
             starData = (ra, xyz, content, hashtags) :: starData;
           case CulminationPattern(content) =>
             val ra = calcRa(raStr);
-            culminationContents = (ra, content, hashtags, starNames) :: culminationContents;
+            culminationContents = (ra, content, urlOpt, hashtags, starNames) :: culminationContents;
           case LunchTimeContentPattern(content) =>
             val ra = calcRa(raStr);
-            lunchTimeContents = (ra, content, hashtags) :: lunchTimeContents;
+            lunchTimeContents = (ra, content, urlOpt, hashtags) :: lunchTimeContents;
           case LunchTimeContentPattern2(decStr, content) =>
             val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
             val p = content.indexOf("座");
             val word = content.substring(0, p + 1);
-            lunchTimeContents2 = Words.ConstellationLunchTimeContent(word, content, hashtags, ra, dec, xyz) :: lunchTimeContents2;
+            lunchTimeContents2 = Words.ConstellationLunchTimeContent(word, content, urlOpt, hashtags, ra, dec, xyz) :: lunchTimeContents2;
           case AreaPattern(decStr, content) =>
             val lngH = raStr.substring(0, 2).toInt;
             val lngM = raStr.substring(3, 5).toInt / 20 * 20;
@@ -1056,10 +1064,12 @@ object Words {
   trait LunchTimeContent {
     def word: String;
     def content(day: Int): String;
+    def urlOpt: Option[String];
     def hashtags: List[String];
   }
 
-  case class ConstellationLunchTimeContent (word: String, contentTemplate: String, hashtags: List[String],
+  case class ConstellationLunchTimeContent (word: String, contentTemplate: String,
+    urlOpt: Option[String], hashtags: List[String],
     ra: Double, dec: Double, xyz: Array[Double]) extends LunchTimeContent {
     def content(day: Int): String = {
       val altHor = -0.90 / PI57;
@@ -1214,7 +1224,7 @@ class Words(constellationData: Constellations) {
           val c = content.content(day + inc / 4);
           if (c != "") {
             val msg = c + content.hashtags.map(" #" + _).mkString("");
-            putTweet(time1 + 1.0 * (inc % 4) / 24, msg);
+            putTweet(time1 + 1.0 * (inc % 4) / 24, msg, content.urlOpt);
             if (inc == 0) {
               addHistory(word, day + inc / 4);
             }
@@ -2039,13 +2049,34 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
 sealed trait TweetContent {
   def time: Double;
   def message: String;
+  def urlOpt: Option[String] = None;
   def hashtags: List[String];
   def starNames: List[String];
 
   def date: String = TimeLib.timeToDateString(time);
+  def tweetContent: String = {
+    val (msg, length) = urlOpt match {
+      case None      =>
+        val msg = message + hashtags.map(" #" + _).mkString;
+        val length = msg.length;
+        (msg, length);
+      case Some(url) =>
+        val msg = message + " " + url + hashtags.map(" #" + _).mkString;
+        val length = msg.length - url.length - 1 + 12;
+        (msg, length);
+    }
+    if (msg.indexOf("ERROR") >= 0) {
+      "#" + msg;
+    } else if (length > 140) {
+      "#TOO_LONG(%d) %s".format(length, msg);
+    } else {
+      msg;
+    }
+  }
 }
 
-case class LegacyTweetContent(time: Double, message: String, starNames: List[String]) extends  TweetContent {
+case class LegacyTweetContent(time: Double, message: String,
+  override val urlOpt: Option[String], starNames: List[String]) extends  TweetContent {
   def hashtags: List[String] = Nil;
 }
 
@@ -2098,11 +2129,15 @@ def putTweet(tc: TweetContent): Unit = {
 }
 
 def putTweet(time: Double, msg: String): Unit = {
-  putTweet(LegacyTweetContent(time, msg, Nil));
+  putTweet(LegacyTweetContent(time, msg, None, Nil));
+}
+
+def putTweet(time: Double, msg: String, urlOpt: Option[String]): Unit = {
+  putTweet(LegacyTweetContent(time, msg, urlOpt, Nil));
 }
 
 def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
-  putTweet(LegacyTweetContent(time, msg, starNames));
+  putTweet(LegacyTweetContent(time, msg, None, starNames));
 }
 
 //==============================================================================
@@ -3072,7 +3107,7 @@ tweetMoonRiseSet();
 {
   import Ordering.Double.IeeeOrdering;
   case class StarTweetContent(time: Double, message: String,
-    hashtags2: List[String], starNames: List[String]) extends TweetContent {
+    override val urlOpt: Option[String], hashtags2: List[String], starNames: List[String]) extends TweetContent {
     def hashtags: List[String] = hashtags2 ::: "星空" :: "星座" :: Nil;
   }
 
@@ -3300,9 +3335,10 @@ tweetMoonRiseSet();
           } else {
             culminationContents(index)._2 + "。月明かりなし";
           }
-          val hashtags = culminationContents(index)._3;
-          val starNames = culminationContents(index)._4;
-          putTweet(StarTweetContent(time0, msg, hashtags, starNames));
+          val urlOpt = culminationContents(index)._3;
+          val hashtags = culminationContents(index)._4;
+          val starNames = culminationContents(index)._5;
+          putTweet(StarTweetContent(time0, msg, urlOpt, hashtags, starNames));
           index += 1;
           if (index == culminationContents.size) {
             index = 0;
@@ -3337,9 +3373,10 @@ tweetMoonRiseSet();
           }
           day1 = if (p < 0) day1 else day1 + p;
         }
-        val hashtags = lunchTimeContents(index)._3;
+        val urlOpt = lunchTimeContents(index)._3;
+        val hashtags = lunchTimeContents(index)._4;
         val starNames = Nil;
-        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, hashtags, starNames));
+        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
         index += 1;
         if (index == lunchTimeContents.size) {
           index = 0;
@@ -3429,14 +3466,8 @@ tweetMoonRiseSet();
   getTweets(startTime + day).tweets.foreach { case tc =>
     val time = tc.time;
     if (time >= startTime && time < endTime) {
-      val msg = tc.message + tc.hashtags.map(" #" + _).mkString;
-      if (msg.indexOf("ERROR") >= 0) {
-        println("%s #%s".format(TimeLib.timeToDateTimeString(time), msg));
-      } else if (msg.length > 140) {
-        println("%s #TOO_LONG(%d) %s".format(TimeLib.timeToDateTimeString(time), msg.length, msg));
-      } else {
-        println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
-      }
+      val msg = tc.tweetContent;
+      println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
     }
   }
 }
