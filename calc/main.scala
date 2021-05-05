@@ -1188,12 +1188,7 @@ class Words(constellationData: Constellations) {
 
   private def findRecentWord(day: Int): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
     val time = startTime + day + 12.0 / 24;
-    val lastTweets = {
-      (-7 to 0).flatMap(i => getTweets(startTime + day + i).tweets).filter { t =>
-        val d = t.time - time;
-        (d >= -7.1 && d < 0.0);
-      }
-    }
+    val lastTweets = (-13 to 0).flatMap(i => getTweets(startTime + day + i).tweets);
     val lst = lastTweets.flatMap(_.starNames);
     if (lst.nonEmpty) {
       import Ordering.Double.IeeeOrdering;
