@@ -3389,37 +3389,35 @@ tweetMoonRiseSet();
 
   putTweetCulminations();
 
-  (90 until period).foreach { day => // PERIOD
-    val wday = TimeLib.wday(startTime + day);
+  {
     var kind: Int = 0;
-    if (wday == 1) { // 月曜
-      if ((startTime + day).toInt % 2 == 0) {
-        putTweetConstellations21(day);
-      } else {
-        var i: Int = 0;
-        var f = false;
-        while (!f && i < 3) {
-          if (kind == 0) {
-            f = putTweetConstellationsGalaxy(day);
-            kind = 1;
-          } else if (kind == 1) {
-            f = putTweetConstellationsEcliptical(day);
-            kind = 2;
-          } else if (kind == 2) {
-            f = putTweetConstellationsSouth(day);
-            kind = 0;
+    (90 until period).foreach { day => // PERIOD
+      val wday = TimeLib.wday(startTime + day);
+      if (wday == 1) { // 月曜
+        if ((startTime + day).toInt % 2 == 0) {
+          putTweetConstellations21(day);
+        } else {
+          var i: Int = 0;
+          var f = false;
+          while (!f && i < 3) {
+            if (kind == 0) {
+              f = putTweetConstellationsGalaxy(day);
+              kind = 1;
+            } else if (kind == 1) {
+              f = putTweetConstellationsEcliptical(day);
+              kind = 2;
+            } else if (kind == 2) {
+              f = putTweetConstellationsSouth(day);
+              kind = 0;
+            }
+            i += 1;
           }
-          i += 1;
+        }
+      } else if (wday == 3) { // 水曜
+        if ((startTime + day).toInt % 2 == 1) {
+          putTweetBrightStars21(day);
         }
       }
-    } else if (wday == 3) { // 水曜
-      if ((startTime + day).toInt % 2 == 1) {
-        putTweetBrightStars21(day);
-      }
-    } else if (wday == 5) { // 金曜
-      //if ((startTime + day).toInt % 2 == 1) {
-      //  putTweetBrightStarsSunset(day);
-      //}
     }
   }
   (99 until period).foreach { day => // PERIOD
