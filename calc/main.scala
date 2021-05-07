@@ -82,6 +82,7 @@ object JplData {
   }
 
   sealed trait TargetPlanet;
+  object Sun     extends TargetPlanet;
   object Moon    extends TargetPlanet;
   object Mercury extends TargetPlanet;
   object Venus   extends TargetPlanet;
@@ -142,7 +143,7 @@ class JplData(dataPath: String) {
     }
   }
 
-  def calcPlanetPosition(time: Double, planet: JplData.JplPlanet): Array[Double] = {
+  private[this] def calcPlanetPosition(time: Double, planet: JplData.JplPlanet): Array[Double] = {
     val (periodData, time2) = getPeriodData(time);
     val time3 = time2 * planet.subPeriodCount;
     val subPeriodIndex = time3.toInt;
@@ -156,7 +157,7 @@ class JplData(dataPath: String) {
     ret;
   }
 
-  def calcEarthPosition(time: Double): Array[Double] = {
+  private[this] def calcEarthPosition(time: Double): Array[Double] = {
     val em = calcPlanetPosition(time, JplData.EARTH_MOON_BARYCENTER_JPL);
     val moon = calcPlanetPosition(time, JplData.MOON_JPL);
     val emrat1 = JplData.EMRAT1;
@@ -167,41 +168,17 @@ class JplData(dataPath: String) {
     ret1;
   }
 
-  def calcEarthAndMoonPosition(time: Double): (Array[Double], Array[Double]) = {
-    val em = calcPlanetPosition(time, JplData.EARTH_MOON_BARYCENTER_JPL);
-    val moon = calcPlanetPosition(time, JplData.MOON_JPL);
-    val emrat1 = JplData.EMRAT1;
-    val ret1 = new Array[Double](3);
-    ret1(0) = em(0) - moon(0) * emrat1;
-    ret1(1) = em(1) - moon(1) * emrat1;
-    ret1(2) = em(2) - moon(2) * emrat1;
-    val ret2 = new Array[Double](3);
-    ret2(0) = ret1(0) + moon(0);
-    ret2(1) = ret1(1) + moon(1);
-    ret2(2) = ret1(2) + moon(2);
-    (ret1, ret2);
-  }
-
-  def calcSunFromEarth(time: Double): Array[Double] = {
-    val earth = calcEarthPosition(time);
-    val sun = calcPlanetPosition(time, JplData.SUN_JPL);
-    VectorLib.minus(sun, earth);
-  }
-
-  def calcMoonFromEarth(time: Double): Array[Double] = {
-    calcPlanetPosition(time, JplData.MOON_JPL);
-  }
-
   def calcPlanetFromEarth(time: Double, targetPlanet: JplData.TargetPlanet): Array[Double] = {
-    val earth = calcEarthPosition(time);
     val target = targetPlanet match {
-      case JplData.Moon    => return calcMoonFromEarth(time);
+      case JplData.Sun     => calcPlanetPosition(time, JplData.SUN_JPL);
+      case JplData.Moon    => return calcPlanetPosition(time, JplData.MOON_JPL);
       case JplData.Mercury => calcPlanetPosition(time, JplData.MERCURY_JPL);
       case JplData.Venus   => calcPlanetPosition(time, JplData.VENUS_JPL);
       case JplData.Mars    => calcPlanetPosition(time, JplData.MARS_JPL);
       case JplData.Jupiter => calcPlanetPosition(time, JplData.JUPITER_JPL);
       case JplData.Saturn  => calcPlanetPosition(time, JplData.SATURN_JPL);
     }
+    val earth = calcEarthPosition(time);
     VectorLib.minus(target, earth);
   }
 
@@ -234,7 +211,8 @@ object TimeLib {
     java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString.substring(0, 16);
   }
 
-  def modifiedJulianDayToStringJSTNaturalTime(time: Double): String = {
+  // 12時00分
+  def timeToTimeNaturalString(time: Double): String = {
     val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
     "%s時%s分".format(str.substring(11, 13), str.substring(14, 16));
   }
@@ -1699,7 +1677,7 @@ val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, td
   (0 until period).map { d =>
     val time = Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val tdb = TimeLib.mjdutcToTdb(time);
-      val sun = jplData.calcSunFromEarth(tdb);
+      val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
       val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(sun2, time);
@@ -1783,10 +1761,7 @@ def touchMoonRiseSetStr(time0: Double): Option[String] = {
   def isNextDay(time: Double): Boolean = {
     (time0 + 9.0 / 24).toInt < (time + 9.0 / 24).toInt;
   }
-  def timeStr0(time: Double): String = {
-    val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
-    "%s時%s分".format(str.substring(11, 13), str.substring(14, 16));
-  }
+  def timeStr0(time: Double): String = TimeLib.timeToTimeNaturalString(time);
   if (p < 0 || p >= moonRiseSetTimesData.size) {
     Some("ERROR");
   } else if (moonRiseSetTimesData(p)._1 - time0 > 8.0 / 24) {
@@ -1838,10 +1813,7 @@ def moonRiseSetForMeteorShower(time0: Double): String = {
   def isNextDay(time: Double): Boolean = {
     (time0 + 9.0 / 24).toInt < (time + 9.0 / 24).toInt;
   }
-  def timeStr0(time: Double): String = {
-    val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
-    "%s時%s分".format(str.substring(11, 13), str.substring(14, 16));
-  }
+  def timeStr0(time: Double): String = TimeLib.timeToTimeNaturalString(time);
   val p1 = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._1 - time0);
   val p2 = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._3 - time0);
   val moonRiseTime = moonRiseSetTimesData(p1)._1;
@@ -1920,8 +1892,8 @@ def moonPhaseNaturalString(moonPhase: Double): String = {
 def calcMoonLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcSunFromEarth(tdb);
-  val moon = jplData.calcMoonFromEarth(tdb);
+  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
+  val moon = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
   val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
@@ -2004,7 +1976,7 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
   val utc = time;
   val ut1 = time; // 近似的
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun_xyz = jplData.calcSunFromEarth(tdb);
+  val sun_xyz = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val sun_distance = VectorLib.angularDistance(sun_xyz, xyz);
   if (sun_distance < sun_distanceThres) {
     None;
@@ -2170,7 +2142,7 @@ def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
 def calcSunLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcSunFromEarth(tdb);
+  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
@@ -2179,7 +2151,7 @@ def calcSunLng(time: Double): Double = {
 def calcSunLng2(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcSunFromEarth(tdb);
+  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
@@ -2312,7 +2284,7 @@ def calcSunLng2(time: Double): Double = {
   def calcMoonConstellation(time: Double): Option[(String, List[String])] = {
     if (isNightTime2(time)) {
       val tdb = TimeLib.mjdutcToTdb(time);
-      val xyz = jplData.calcMoonFromEarth(tdb);
+      val xyz = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
       val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -2332,7 +2304,7 @@ def calcSunLng2(time: Double): Double = {
     val fullMoonsDistanceMaxMinUpDownFlags = MathLib.getMaxMinUpDownFlagListDiscrete(0, fullMoons.size, 2) { idx =>
       val utc = fullMoons(idx);
       val tdb = TimeLib.mjdutcToTdb(utc);
-      val moon = jplData.calcMoonFromEarth(tdb);
+      val moon = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
       VectorLib.distance(moon);
     }
     fullMoonsDistanceMaxMinUpDownFlags.zipWithIndex.map { case (flag, idx) =>
@@ -2375,7 +2347,7 @@ def calcSunLng2(time: Double): Double = {
 MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcSunFromEarth(tdb);
+  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
   VectorLib.distance(sun);
 }.foreach { case (time, flag) =>
   val s = if (flag < 0) "近日点" else "遠日点";
@@ -2395,7 +2367,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
   def calcInnerPlanetLngEc(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
+    val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
     val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
     val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
@@ -2453,7 +2425,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
   def calcOuterPlanetLngEq(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcSunFromEarth(tdb);
+    val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
     val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
@@ -2627,29 +2599,29 @@ case class SunsetStarTweetContent(day: Int, starName: String,
 case class SunsetTweetContent(day: Int, flag: Int) extends OnSunsetTweetContent {
   def message(level: Int): String = {
     if (flag == 1) {
-      "日没はこのころが最も遅く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+      "日没はこのころが最も遅く、%sごろです".format(TimeLib.timeToTimeNaturalString(time));
     } else if (flag == 3) {
-      "日没はこのころが最も早く、%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+      "日没はこのころが最も早く、%sごろです".format(TimeLib.timeToTimeNaturalString(time));
     } else {
       if (day >= 7) {
         val timePrev = sunsetTimes(day - 7);
         val d = Math.round((time - (timePrev + 7.0)) * (24 * 60));
         if (d > 0) {
-          "日没は%sごろで、この1週間で約%d分遅くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), d);
+          "日没は%sごろで、この1週間で約%d分遅くなっています".format(TimeLib.timeToTimeNaturalString(time), d);
         } else if (d < 0) {
-          "日没は%sごろで、この1週間で約%d分早くなっています".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time), -d);
+          "日没は%sごろで、この1週間で約%d分早くなっています".format(TimeLib.timeToTimeNaturalString(time), -d);
         } else {
           if (level == 2) {
-            "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+            "日没は%sごろ".format(TimeLib.timeToTimeNaturalString(time));
           } else {
-            "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+            "日没は%sごろです".format(TimeLib.timeToTimeNaturalString(time));
           }
         }
       } else {
         if (level == 2) {
-          "日没は%sごろ".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+          "日没は%sごろ".format(TimeLib.timeToTimeNaturalString(time));
         } else {
-          "日没は%sごろです".format(TimeLib.modifiedJulianDayToStringJSTNaturalTime(time));
+          "日没は%sごろです".format(TimeLib.timeToTimeNaturalString(time));
         }
       }
     }
