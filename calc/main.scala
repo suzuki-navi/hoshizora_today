@@ -288,7 +288,7 @@ object TimeLib {
   }
 
   // "来年1月"
-  def monthString(time0: Double, time1: Double, time2: Double): String = {
+  def monthString(time0: Double, day1: Int, day2: Int): String = {
     def sub(time: Double): (Int, Int) = {
       val str = java.time.Instant.ofEpochSecond(((time - 40587.0) * 86400.0 + 0.5).toLong + 9 * 3600).toString;
       val year = str.substring(0, 4);
@@ -296,8 +296,8 @@ object TimeLib {
       (year.toInt, month.toInt);
     }
     val (y0, m0) = sub(time0);
-    val (y1, m1) = sub(time1);
-    val (y2, m2) = sub(time2);
+    val (y1, m1) = sub(startTime + day1);
+    val (y2, m2) = sub(startTime + day2);
     val s1 = if (y0 == y1 && m0 == m1) {
       "今月";
     } else if (y0 == y1 && m0 + 1 == m1 || y0 + 1 == y1 && m0 - 11 == m1) {
@@ -2464,12 +2464,8 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     d1;
   }
 
-  val planetPhases1: List[(Double, String, String, Boolean, Option[Array[Double]])] = List(
-    ("火星", JplData.Mars),
-    ("木星", JplData.Jupiter),
-    ("土星", JplData.Saturn),
-  ).flatMap { t =>
-    val (planetName, targetPlanet) = t;
+  val planetPhases1: List[(Double, String, String, Boolean, Option[Array[Double]], Int)] = outerPlanets.zipWithIndex.toList.
+  flatMap { case ((planetName, targetPlanet, _), pi) =>
     MathLib.findCyclicPhaseListContinuous(4, startTime, endTime, 30, 24) { time =>
       PI2 - calcOuterPlanetLngEq(time, targetPlanet);
     }.map { case (time, term) =>
@@ -2477,40 +2473,53 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
       val tdb = TimeLib.mjdutcToTdb(utc);
       val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
       if (term == 0) {
-        (time, planetName, "合(赤経基準)", false, None);
+        (time, planetName, "合(赤経基準)", false, None, pi);
       } else if (term == 1) {
-        (time, planetName, "西矩(赤経基準)", false, Some(xyz));
+        (time, planetName, "西矩(赤経基準)", false, Some(xyz), pi);
       } else if (term == 2) {
-        (time, planetName, "衝(赤経基準)", false, Some(xyz));
+        (time, planetName, "衝(赤経基準)", false, Some(xyz), pi);
       } else {
-        (time, planetName, "東矩(赤経基準)", false, Some(xyz));
+        (time, planetName, "東矩(赤経基準)", false, Some(xyz), pi);
       }
     }
   }
 
-  planetPhases1.foreach { case (time, planetName, content, timeFlag, xyzOpt) =>
+  val altThres = 15 / PI57;
+
+  planetPhases1.foreach { case (time, planetName, content, timeFlag, xyzOpt, pi) =>
     val time2 = if (timeFlag) {
       TimeLib.round(time, 24) - 1.0 / (24 * 4);
     } else {
       TimeLib.floor(time, 24) + 1.0 / (24 * 4);
     }
-    xyzOpt match {
-    case None =>
-      putTweet(time2, "%sが%s #%s".format(planetName, content, planetName));
-    case Some(xyz) =>
-      val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
-      putTweet(time2, "%sが%s。%sにいます #%s".format(planetName, content, cons, planetName) +
-        hashtags.map(" #" + _).mkString);
+    val nextSeasonMsg = {
+      val day = (time - startTime).toInt;
+      val (azi, alt) = outerPlanetsNightAziAltList(pi)(day);
+      if (alt < altThres) {
+        val (p1, p2) = calcNextSeason(outerPlanetsNightAziAltList(pi), day);
+        "。" + NightNextPlanetTweetContent(time2, planetName, p1, p2).message;
+      } else {
+        "";
+      }
     }
+    val tweet = xyzOpt match {
+      case None =>
+        PlanetAstronomyTweetContent(time2, "%sが%s%s".format(planetName, content, nextSeasonMsg), planetName);
+      case Some(xyz) =>
+        val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
+        PlanetAstronomyTweetContent(time2, "%sが%s。%sにいます%s".format(planetName, content, cons, nextSeasonMsg) +
+          hashtags.map(" #" + _).mkString, planetName);
+    }
+    putTweet(tweet);
   }
 }
 
 case class SunsetNextPlanetTweetContent(time: Double, planetName: String,
-  nextDay1: Double, nextDay2: Double) extends TweetContent {
+  nextDay1: Int, nextDay2: Int) extends TweetContent {
   def message: String = {
-    if (nextDay1 < 0.0) {
+    if (nextDay1 < 0) {
       "%sが次に日没時に見えやすくなるのは、ERRORです".format(planetName);
-    } else if (nextDay2 < 0.0) {
+    } else if (nextDay2 < 0) {
       "%sが次に日没時に見えやすくなるのは、%sからERRORです".format(planetName,
         TimeLib.monthString(time, nextDay1, nextDay1));
     } else {
@@ -2522,11 +2531,11 @@ case class SunsetNextPlanetTweetContent(time: Double, planetName: String,
   def starNames: List[String] = List(planetName);
 }
 case class NightNextPlanetTweetContent(time: Double, planetName: String,
-  nextDay1: Double, nextDay2: Double) extends TweetContent {
+  nextDay1: Int, nextDay2: Int) extends TweetContent {
   def message: String = {
-    if (nextDay1 < 0.0) {
+    if (nextDay1 < 0) {
       "%sが次に夜見えやすくなるのは、ERRORです(21時基準)".format(planetName);
-    } else if (nextDay2 < 0.0) {
+    } else if (nextDay2 < 0) {
       "%sが次に夜見えやすくなるのは、%sからERRORです(21時基準)".format(planetName,
         TimeLib.monthString(time, nextDay1, nextDay1));
     } else {
@@ -2760,12 +2769,24 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
   }
 }
 
+def calcNextSeason(aziAltList: IndexedSeq[(Double, Double)], day: Int): (Int, Int) = {
+  val altThres = 15 / PI57;
+  val p1 = aziAltList.indexWhere(_._2 >= altThres, day);
+  if (p1 >= 0) {
+    val p2 = aziAltList.indexWhere(_._2 < altThres, p1) - 1;
+    if (p2 >= 0) {
+      (p1, p2);
+    } else {
+      (p1, -1);
+    }
+  } else {
+    (-1, -1);
+  }
+}
+
 // 水曜・金曜だけど水星・金星が見えない場合
 {
-  val aziThres0 = 200 / PI57;
-  val aziThres1 = 315 / PI57;
-  val altThres0 = 10 / PI57;
-  val altThres1 = 15 / PI57;
+  val altThres = 15 / PI57;
 
   innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
     (1 until period).foreach { day =>
@@ -2774,19 +2795,10 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
         val sunsetTweets = getTweets(startTime + day).sunsetTweets;
         if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
           val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
-          if (alt < altThres0) {
+          if (alt < altThres) {
             val time = startTime + day + 12.5 / 24;
-            val p1 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 >= altThres1, day);
-            if (p1 >= 0) {
-              val p2 = innerPlanetsSunsetAziAltList(pi).indexWhere(_._2 < altThres1, p1) - 1;
-              if (p2 >= 0) {
-                putTweet(SunsetNextPlanetTweetContent(time, planet._1, startTime + p1, startTime + p2));
-              } else {
-                putTweet(SunsetNextPlanetTweetContent(time, planet._1, startTime + p1, -1));
-              }
-            } else {
-              putTweet(SunsetNextPlanetTweetContent(time, planet._1, -1, -1));
-            }
+            val (p1, p2) = calcNextSeason(innerPlanetsSunsetAziAltList(pi), day);
+            putTweet(SunsetNextPlanetTweetContent(time, planet._1, p1, p2));
           }
         }
       }
@@ -3068,19 +3080,17 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         val wday = TimeLib.wday(startTime + day);
         val tweets = getTweets(startTime + day).tweets;
         if (wday == planet._3 && !tweets.exists(_.starNames.contains(planet._1))) {
-          val (azi, alt) = outerPlanetsNightAziAltList(pi)(day);
-          if (alt < altThres) {
-            val time = startTime + day + 12.5 / 24;
-            val p1 = outerPlanetsNightAziAltList(pi).indexWhere(_._2 >= altThres, day);
-            if (p1 >= 0) {
-              val p2 = outerPlanetsNightAziAltList(pi).indexWhere(_._2 < altThres, p1) - 1;
-              if (p2 >= 0) {
-                putTweet(NightNextPlanetTweetContent(time, planet._1, startTime + p1, startTime + p2));
-              } else {
-                putTweet(NightNextPlanetTweetContent(time, planet._1, startTime + p1, -1));
-              }
-            } else {
-              putTweet(NightNextPlanetTweetContent(time, planet._1, -1, -1));
+          if (!(-6 to +6).exists { i =>
+            getTweets(startTime + day + i).tweets.exists {
+              case PlanetAstronomyTweetContent(_, _, planetName) if (planetName == planet._1) => true;
+              case _ => false;
+            }
+          }) {
+            val (azi, alt) = outerPlanetsNightAziAltList(pi)(day);
+            if (alt < altThres) {
+              val time = startTime + day + 12.5 / 24;
+              val (p1, p2) = calcNextSeason(outerPlanetsNightAziAltList(pi), day);
+              putTweet(NightNextPlanetTweetContent(time, planet._1, p1, p2));
             }
           }
         }
