@@ -3170,8 +3170,8 @@ tweetMoonRiseSet();
     putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
-  // この時期日没時の一番星候補となる明るい星
-  def putTweetBrightStarsSunset(day: Int): Unit = {
+  // この時期日没時の一番星となりうる明るい星
+  def putTweetFirstStar(day: Int): Unit = {
     val altHor = -0.90 / PI57;
     val altThres30 = 30.0 / PI57;
     //val altThres = 0.0;
@@ -3214,8 +3214,7 @@ tweetMoonRiseSet();
         "%s(%s)".format(name, aziAltStr);
       }.mkString("、");
       val starNames = constellations.map(_._3).toList;
-      val msg = "この時期日没時の一番星候補となる明るい星は、%sです".format(constellationsStr);
-      //putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      val msg = "この時期日没時の一番星となりうる明るい星は、%sです".format(constellationsStr);
       putTweet(SunsetFirstStarTweetContent(day, msg, starNames));
     }
   }
@@ -3400,8 +3399,10 @@ tweetMoonRiseSet();
   (99 until period).foreach { day => // PERIOD
     val wday = TimeLib.wday(startTime + day);
     if (wday == 1) {
-      if (getTweets(startTime + day).sunsetTweets.isEmpty) {
-        putTweetBrightStarsSunset(day);
+      if ((startTime + day).toInt % 2 == 0) {
+        if (getTweets(startTime + day).sunsetTweets.isEmpty) {
+          //putTweetFirstStar(day);
+        }
       }
     }
   }
