@@ -2812,7 +2812,16 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   }
   def moonPhaseStr: String = {
     if (fastStarName == "月") {
-      "。月相%.1f/28".format(calcMoonPhase(time));
+      val moonPhase = calcMoonPhase(time);
+      val moonStr: String = {
+        val s = moonPhaseNaturalString(moonPhase);
+        if (s == "") {
+          s;
+        } else {
+          "。" + s + "です";
+        }
+      }
+      "。月相%.1f/28%s".format(moonPhase, moonStr);
     } else {
       "";
     }
@@ -2822,7 +2831,8 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 
 {
   val altThres0 = 10 / PI57;
-  val distanceThres = 10.0 / PI57;
+  val distanceThres = 3.0 / PI57;
+  val distanceThresMoon = 6.0 / PI57;
 
   def calcClosestMoon(slowStarName: String, fastStarName: String, hashtags: List[String],
     slowStarXyzFunc: Double => Array[Double],
@@ -2843,7 +2853,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         if (alt >= altThres0) {
           val xyz_s = slowStarXyzFunc(tdb);
           val distance = VectorLib.angularDistance(xyz_s, xyz_f);
-          if (distance < distanceThres) {
+          if (distance < distanceThresMoon) {
             putTweet(CloseStarsTweetContent(time, 24 * 6, slowStarName, fastStarName, distance, hashtags));
           }
         }
