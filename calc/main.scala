@@ -2323,9 +2323,9 @@ def calcSunLng2(time: Double): Double = {
       val (time, alt) = midAltData(i);
       if (i > 0 && i < midAltData.size - 1) {
         if (midAltData(i - 1)._2 <= alt && midAltData(i + 1)._2 < alt) {
-          putTweet(time, "満月が南中(高度%.0f°)。冬の満月は空高く上り、今日はこの冬でもっとも天頂に近いです".format(alt * PI57));
+          putTweet(time, "満月が南中(高度%.0f°)。冬の満月は空高く上り、今日はこの冬でもっとも天頂に近い満月です".format(alt * PI57));
         } else if (midAltData(i - 1)._2 >= alt && midAltData(i + 1)._2 > alt) {
-          putTweet(time, "満月が南中(高度%.0f°)。夏の満月は空低く、今日はこの夏でもっとも低いです".format(alt * PI57));
+          putTweet(time, "満月が南中(高度%.0f°)。夏の満月は空低く、今日はこの夏でもっとも低い満月です".format(alt * PI57));
         } else {
           putTweet(time, "満月が南中(高度%.0f°)".format(alt * PI57));
         }
