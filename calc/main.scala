@@ -1,7 +1,9 @@
 import java.time.OffsetDateTime;
 
 val startTime = TimeLib.stringToModifiedJulianDay(args(0) + "T00:00:00+09:00");
-val endTime = TimeLib.stringToModifiedJulianDay(args(1) + "T00:00:00+09:00");
+val startTime1 = TimeLib.stringToModifiedJulianDay(args(1) + ":00+09:00");
+val endTime1 = TimeLib.stringToModifiedJulianDay(args(2) + ":00+09:00");
+val endTime = TimeLib.stringToModifiedJulianDay(args(3) + "T00:00:00+09:00");
 val period = (endTime - startTime).toInt;
 
 
@@ -3503,7 +3505,7 @@ tweetMoonRiseSet();
 (0 until period).foreach { day =>
   getTweets(startTime + day).tweets.foreach { case tc =>
     val time = tc.time;
-    if (time >= startTime && time < endTime) {
+    if (time >= startTime1 && time < endTime1) {
       val msg = tc.tweetContent;
       println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
     }

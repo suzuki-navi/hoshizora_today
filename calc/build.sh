@@ -8,13 +8,9 @@ cd $(dirname $0)
 
 echo "Starting calculating..."
 
-time scala -deprecation ./main.scala $start0 $end0 >| ../var/statuses.txt
+time scala -deprecation ./main.scala $start0  $start1 $end1 $end0 >| ../var/data.txt
 
 echo "Finished calculating..."
-
-cat diff.txt | grep '^20' | LC_ALL=C sort >| ../var/diff.txt
-
-cat ../var/statuses.txt | node patch.js $start1 $end1 >| ../var/data.txt
 
 mv ../var/data.txt ../data.txt
 
