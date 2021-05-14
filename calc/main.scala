@@ -11,6 +11,7 @@ val nutPlDataPath = "../static/nut-pl.txt";
 val constellationsDataPath = "constellations.txt";
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
+val diffDataPath = "diff.txt";
 
 val wordHistoryPath = "../etc/word-history.txt";
 
@@ -2065,6 +2066,18 @@ case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[Tweet
         }
     }
   }
+  def removed(time: Double, message: String): DateTweets = {
+    def p(tc: TweetContent): Boolean = {
+      TimeLib.timeToDateTimeString(tc.time) == TimeLib.timeToDateTimeString(time) &&
+      tc.message == message;
+    }
+    if ((otherTweets ::: daytimeTweets ::: sunsetTweets ::: nightTweets).exists(p)) {
+      DateTweets(otherTweets.filter(!p(_)), daytimeTweets.filter(!p(_)),
+        sunsetTweets.filter(!p(_)), nightTweets.filter(!p(_)));
+    } else {
+      added(LegacyTweetContent(time, "#-" + message, None, Nil));
+    }
+  }
   def tweets: List[TweetContent] = {
     import Ordering.Double.IeeeOrdering;
     ((if (sunsetTweets.isEmpty) {
@@ -2105,6 +2118,14 @@ def putTweet(time: Double, msg: String, urlOpt: Option[String]): Unit = {
 
 def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
   putTweet(LegacyTweetContent(time, msg, None, starNames));
+}
+
+def removeTweet(time: Double, message: String): Unit = {
+  val date = TimeLib.timeToDateString(time);
+  if (_tweets.contains(date)) {
+    val tw = _tweets(date);
+    _tweets = _tweets.updated(date, tw.removed(time, message));
+  }
 }
 
 //==============================================================================
@@ -3423,6 +3444,37 @@ tweetMoonRiseSet();
     if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       words.putTweetWord(day);
     }
+  }
+}
+
+//==============================================================================
+
+{
+  val diffData: List[(Double, Int, String)] = {
+    var diffData: List[(Double, Int, String)] = Nil;
+    val source = scala.io.Source.fromFile(diffDataPath);
+    source.getLines.foreach { line =>
+      if (line != "" && !line.startsWith("#")) {
+        val cols = line.split(" ", 2);
+        val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
+        val sign = cols(1).charAt(0);
+        val content = cols(1).substring(1);
+        if (sign == '-') {
+          diffData = (time, -1, content) :: diffData;
+        } else if (sign == '+') {
+          diffData = (time, +1, content) :: diffData;
+        }
+      }
+    }
+    source.close();
+    import Ordering.Double.IeeeOrdering;
+    diffData.reverse.sortBy(_._1);
+  }
+  diffData.filter(_._2 < 0).foreach { d =>
+    removeTweet(d._1, d._3);
+  }
+  diffData.filter(_._2 > 0).foreach { d =>
+    putTweet(d._1, d._3);
   }
 }
 
