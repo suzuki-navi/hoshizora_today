@@ -1,9 +1,11 @@
 import java.time.OffsetDateTime;
 
-val startTime = TimeLib.stringToModifiedJulianDay(args(0) + "T00:00:00+09:00");
-val startTime1 = TimeLib.stringToModifiedJulianDay(args(1) + ":00+09:00");
-val endTime1 = TimeLib.stringToModifiedJulianDay(args(2) + ":00+09:00");
-val endTime = TimeLib.stringToModifiedJulianDay(args(3) + "T00:00:00+09:00");
+// PERIOD
+val startTime = TimeLib.stringToModifiedJulianDay("2021-01-31T00:00:00+09:00");
+val startTime1 = TimeLib.stringToModifiedJulianDay("2021-05-12T00:00:00+09:00");
+val endTime1 = TimeLib.stringToModifiedJulianDay("2022-05-12T00:00:00+09:00");
+val endTime = TimeLib.stringToModifiedJulianDay("2022-05-13T00:00:00+09:00");
+
 val period = (endTime - startTime).toInt;
 
 
