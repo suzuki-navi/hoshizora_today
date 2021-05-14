@@ -6,8 +6,8 @@ val period = (endTime - startTime).toInt;
 
 
 val jplDataPath = "../var/ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.430";
-val nutLsDataPath = "nut-ls.txt";
-val nutPlDataPath = "nut-pl.txt";
+val nutLsDataPath = "../static/nut-ls.txt";
+val nutPlDataPath = "../static/nut-pl.txt";
 val constellationsDataPath = "constellations.txt";
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
