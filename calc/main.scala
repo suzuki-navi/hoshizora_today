@@ -17,6 +17,8 @@ val diffDataPath = "diff.txt";
 
 val wordHistoryPath = "../etc/word-history.txt";
 
+val dataPath = "../data.txt";
+
 val PI = Math.PI;
 val PI2 = Math.PI * 2.0;
 val PI2R = 1.0 / PI2;
@@ -3502,16 +3504,18 @@ tweetMoonRiseSet();
 //==============================================================================
 // ツイート出力
 
-(0 until period).foreach { day =>
-  getTweets(startTime + day).tweets.foreach { case tc =>
-    val time = tc.time;
-    if (time >= startTime1 && time < endTime1) {
-      val msg = tc.tweetContent;
-      println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
+words.saveHistory(wordHistoryPath);
+
+scala.util.Using(new java.io.PrintWriter(new java.io.FileOutputStream(dataPath))) { writer =>
+  (0 until period).foreach { day =>
+    getTweets(startTime + day).tweets.foreach { case tc =>
+      val time = tc.time;
+      if (time >= startTime1 && time < endTime1) {
+        val msg = tc.tweetContent;
+        writer.println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
+      }
     }
   }
 }
-
-words.saveHistory(wordHistoryPath);
 
 //==============================================================================
