@@ -3,9 +3,9 @@ object Main {
 
 // PERIOD
 val startTime = TimeLib.stringToModifiedJulianDay("2021-01-31T00:00:00+09:00");
-val startTime1 = TimeLib.stringToModifiedJulianDay("2021-05-12T00:00:00+09:00");
-val endTime1 = TimeLib.stringToModifiedJulianDay("2022-05-12T00:00:00+09:00");
-val endTime = TimeLib.stringToModifiedJulianDay("2022-05-13T00:00:00+09:00");
+val startTime1 = TimeLib.stringToModifiedJulianDay("2021-05-15T12:00:00+09:00");
+val endTime1 = TimeLib.stringToModifiedJulianDay("2022-05-15T12:00:00+09:00");
+val endTime = TimeLib.stringToModifiedJulianDay("2022-05-17T00:00:00+09:00");
 
 val period = (endTime - startTime).toInt;
 
@@ -579,6 +579,14 @@ val moonRiseSetTimesDataTouch: Array[Boolean] = new Array[Boolean](moonRiseSetTi
 
 def touchMoonRiseSetStr(time0: Double): Option[String] = {
   val p = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._1 - time0);
+  val newMoonTime = {
+    val moonPhaseTerms2 = moonPhaseTerms.filter(_._2 == 0);
+    val idx = MathLib.binarySearchBy(moonPhaseTerms2)(t => t._1 - time0);
+    if (idx <= 0) {
+      return Some("ERROR");
+    }
+    moonPhaseTerms2(idx - 1)._1;
+  }
   def isNextDay(time: Double): Boolean = {
     (time0 + 9.0 / 24).toInt < (time + 9.0 / 24).toInt;
   }
@@ -587,12 +595,22 @@ def touchMoonRiseSetStr(time0: Double): Option[String] = {
     Some("ERROR");
   } else if (moonRiseSetTimesData(p)._1 - time0 > 8.0 / 24) {
     None;
+  } else if (p == 0 || p >= moonRiseSetTimesData.size - 1) {
+    Some("ERROR");
   } else {
     moonRiseSetTimesDataTouch(p) = true;
     val data = moonRiseSetTimesData(p);
+    val data_b = moonRiseSetTimesData(p - 1);
+    val data_a = moonRiseSetTimesData(p + 1);
     val moonPhase = calcMoonPhase(data._2);
+    val moonPhaseRatio = 100.0 * calcMoonPhaseRatio(data._2);
+    val moonDayCount = data._2 - newMoonTime;
     val phaseStr = if (data._5 == 0) {
-      "\uD83C\uDF11";
+      if (moonPhase < 14.0) {
+        "、新月\uD83C\uDF11直後";
+      } else {
+        "、新月\uD83C\uDF11直前";
+      }
     } else if (data._5 == 1) {
       "、新月と上弦の中間\uD83C\uDF12";
     } else if (data._5 == 2) {
@@ -607,22 +625,24 @@ def touchMoonRiseSetStr(time0: Double): Option[String] = {
       "\uD83C\uDF17";
     } else if (data._5 == 7) {
       "、下弦と新月の中間\uD83C\uDF18";
+    } else if (data_a._5 == 0) {
+      ""; // "、もうすぐ新月";
+    } else if (data_b._5 == 0) {
+      ""; // "、新月を過ぎたところ";
     } else {
       "";
     }
-    Some(if (isNextDay(data._1)) {
-      "翌日の月の出は%sごろ、南中は%sごろ(月相%.1f/28%s)、月の入りは%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
+    val southStr = "月相%.1f/28、輝面比%.1f%%、月齢%.1f%s".format(moonPhase, moonPhaseRatio, moonDayCount, phaseStr);
+    val format = if (isNextDay(data._1)) {
+      "翌日の月の出は%sごろ、南中は%sごろ(%s)、月の入りは%sごろ";
     } else if (isNextDay(data._2)) {
-      "月の出は%sごろ、南中は翌日%sごろ(月相%.1f/28%s)、月の入りは翌日%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
+      "月の出は%sごろ、南中は翌日%sごろ(%s)、月の入りは翌日%sごろ";
     } else if (isNextDay(data._3)) {
-      "月の出は%sごろ、南中は%sごろ(月相%.1f/28%s)、月の入りは翌日%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
+      "月の出は%sごろ、南中は%sごろ(%s)、月の入りは翌日%sごろ";
     } else {
-      "月の出は%sごろ、南中は%sごろ(月相%.1f/28%s)、月の入りは%sごろ".format(
-        timeStr0(data._1), timeStr0(data._2), moonPhase, phaseStr, timeStr0(data._3));
-    });
+      "月の出は%sごろ、南中は%sごろ(%s)、月の入りは%sごろ";
+    }
+    Some(format.format(timeStr0(data._1), timeStr0(data._2), southStr, timeStr0(data._3)));
   }
 }
 
@@ -724,6 +744,9 @@ def calcMoonLng(time: Double): Double = {
 }
 def calcMoonPhase(time: Double): Double = {
   calcMoonLng(time) / PI2 * 28.0;
+}
+def calcMoonPhaseRatio(time: Double): Double = {
+  0.5 * (1.0 - Math.cos(calcMoonLng(time)));
 }
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
   MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
