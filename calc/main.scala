@@ -724,9 +724,9 @@ def calcMoonPhaseString(time: Double): String = {
     }
   }
   val phaseStr = if (moonPhase > 27.6 || moonPhase > 27.0 && phaseTerm == 0) {
-    "、新月\uD83C\uDF11直前";
+    "、新月\uD83C\uDF11の直前";
   } else if (moonPhase < 0.4 || moonPhase < 1.0 && phaseTerm == 0) {
-    "、新月\uD83C\uDF11直後";
+    "、新月\uD83C\uDF11の直後";
   } else if (moonPhase < 1.75) {
     "、新月後の細い月";
   } else if (moonPhase < 2.75) {
@@ -741,8 +741,10 @@ def calcMoonPhaseString(time: Double): String = {
     "、上弦を過ぎた月";
   } else if (moonPhase > 10.1 && moonPhase < 10.9 || moonPhase > 9.5 && moonPhase < 11.5 && phaseTerm == 3) {
     "、上弦と満月の中間\uD83C\uDF14";
-  } else if (moonPhase > 13.6 && moonPhase < 14.4 || moonPhase > 13.0 && moonPhase < 15.0 && phaseTerm == 4) {
-    "、満月\uD83C\uDF15";
+  } else if (moonPhase > 13.6 && moonPhase < 14.0 || moonPhase > 13.0 && moonPhase < 14.0 && phaseTerm == 4) {
+    "、満月\uD83C\uDF15の直前";
+  } else if (moonPhase >= 14.0 && moonPhase < 14.4 || moonPhase >= 14.0 && moonPhase < 15.0 && phaseTerm == 4) {
+    "、満月\uD83C\uDF15の直後";
   } else if (moonPhase > 13.0 && moonPhase <= 13.6) {
     "、もうすぐ満月";
   } else if (moonPhase > 14.4 && moonPhase < 15.0) {
