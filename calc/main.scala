@@ -27,170 +27,13 @@ val PI2 = Math.PI * 2.0;
 val PI2R = 1.0 / PI2;
 val PI5 = Math.PI * 0.5;
 val PI57 = 180.0 / Math.PI;
-val PI_AS2R = Math.PI / (3600 * 180);
 
 val AU = 1.49597870700000000e+8;
 
 val tokyoLng = 139.7 / PI57;
 val tokyoLat = 35.7 / PI57;
 
-val DEBUG_FLAG = true;
-
 System.err.println("Started calculating...");
-
-object JplData {
-
-  val EMRAT = 81.3005690741906200; // 地球と月の質量比
-  val EMRAT1 = 1.0 / (1.0 + EMRAT);
-
-  sealed trait JplPlanet {
-    def dataOffset: Int;
-    def subPeriodCount: Int;
-    def coefficientCount: Int;
-  }
-  object MERCURY_JPL extends JplPlanet {
-    val dataOffset = 2;
-    val subPeriodCount = 4;
-    val coefficientCount = 14;
-  }
-  object VENUS_JPL extends JplPlanet {
-    val dataOffset = 170;
-    val subPeriodCount = 2;
-    val coefficientCount = 10;
-  }
-  object EARTH_MOON_BARYCENTER_JPL extends JplPlanet {
-    val dataOffset = 230;
-    val subPeriodCount = 2;
-    val coefficientCount = 13;
-  }
-  object MARS_JPL extends JplPlanet {
-    val dataOffset = 308;
-    val subPeriodCount = 1;
-    val coefficientCount = 11;
-  }
-  object JUPITER_JPL extends JplPlanet {
-    val dataOffset = 341;
-    val subPeriodCount = 1;
-    val coefficientCount = 8;
-  }
-  object SATURN_JPL extends JplPlanet {
-    val dataOffset = 365;
-    val subPeriodCount = 1;
-    val coefficientCount = 7;
-  }
-  object MOON_JPL extends JplPlanet {
-    val dataOffset = 440;
-    val subPeriodCount = 8;
-    val coefficientCount = 13;
-  }
-  object SUN_JPL extends JplPlanet {
-    val dataOffset = 752;
-    val subPeriodCount = 2;
-    val coefficientCount = 11;
-  }
-
-  sealed trait TargetPlanet;
-  object Sun     extends TargetPlanet;
-  object Moon    extends TargetPlanet;
-  object Mercury extends TargetPlanet;
-  object Venus   extends TargetPlanet;
-  object Mars    extends TargetPlanet;
-  object Jupiter extends TargetPlanet;
-  object Saturn  extends TargetPlanet;
-
-}
-
-class JplData(dataPath: String) {
-
-  private[this] val jplData: IndexedSeq[IndexedSeq[Double]] = loadJplData(dataPath);
-
-  private[this] def loadJplData(dataPath: String): IndexedSeq[IndexedSeq[Double]] = {
-    val data1 = {
-      val sc = new java.util.Scanner(new java.io.BufferedInputStream(new java.io.FileInputStream(dataPath)));
-      val data1 = scala.collection.mutable.ArrayBuffer[String]();
-      while (sc.hasNext) {
-        data1 += sc.next();
-      }
-      sc.close();
-      data1;
-    }
-    val periodCount = data1.size / 1022;
-    val data2: IndexedSeq[IndexedSeq[Double]] = (0 until periodCount).map { i =>
-      (0 until 1018).map { j =>
-        data1(i * 1022 + 2 + j).replace("D", "E").toDouble;
-      }
-    }
-    data2;
-  }
-
-  private[this] def getPeriodData(time: Double): (IndexedSeq[Double], Double) = {
-    val time2 = (time - (jplData(0)(0) - 2400000.5)) / 32.0;
-    val periodIndex = time2.toInt;
-    (jplData(periodIndex), time2 - periodIndex);
-  }
-
-  private[this] def calcChebyshev(cs: IndexedSeq[Double], x: Double): Double = {
-    // x は -1.0 <= x <= +1.0
-    val n = cs.size;
-    if (n == 1) {
-      cs(0);
-    } else {
-      val x2 = 2.0 * x;
-      var result: Double = cs(0) + cs(1) * x;
-      var i: Int = 2;
-      var t0: Double = 1.0;
-      var t1: Double = x;
-      while (i < n) {
-        val t2 = x2 * t1 - t0;
-        result += cs(i) * t2;
-        t0 = t1;
-        t1 = t2;
-        i = i + 1;
-      }
-      result;
-    }
-  }
-
-  private[this] def calcPlanetPosition(time: Double, planet: JplData.JplPlanet): Array[Double] = {
-    val (periodData, time2) = getPeriodData(time);
-    val time3 = time2 * planet.subPeriodCount;
-    val subPeriodIndex = time3.toInt;
-    val time4 = 2.0 * (time3 - subPeriodIndex) - 1.0;
-    val coefficientCount = planet.coefficientCount;
-    val offset = 3 * coefficientCount * subPeriodIndex + planet.dataOffset;
-    val ret = new Array[Double](3);
-    ret(0) = calcChebyshev(periodData.slice(offset + 0 * coefficientCount, offset + 1 * coefficientCount), time4);
-    ret(1) = calcChebyshev(periodData.slice(offset + 1 * coefficientCount, offset + 2 * coefficientCount), time4);
-    ret(2) = calcChebyshev(periodData.slice(offset + 2 * coefficientCount, offset + 3 * coefficientCount), time4);
-    ret;
-  }
-
-  private[this] def calcEarthPosition(time: Double): Array[Double] = {
-    val em = calcPlanetPosition(time, JplData.EARTH_MOON_BARYCENTER_JPL);
-    val moon = calcPlanetPosition(time, JplData.MOON_JPL);
-    val emrat1 = JplData.EMRAT1;
-    val ret1 = new Array[Double](3);
-    ret1(0) = em(0) - moon(0) * emrat1;
-    ret1(1) = em(1) - moon(1) * emrat1;
-    ret1(2) = em(2) - moon(2) * emrat1;
-    ret1;
-  }
-
-  def calcPlanetFromEarth(time: Double, targetPlanet: JplData.TargetPlanet): Array[Double] = {
-    val target = targetPlanet match {
-      case JplData.Sun     => calcPlanetPosition(time, JplData.SUN_JPL);
-      case JplData.Moon    => return calcPlanetPosition(time, JplData.MOON_JPL);
-      case JplData.Mercury => calcPlanetPosition(time, JplData.MERCURY_JPL);
-      case JplData.Venus   => calcPlanetPosition(time, JplData.VENUS_JPL);
-      case JplData.Mars    => calcPlanetPosition(time, JplData.MARS_JPL);
-      case JplData.Jupiter => calcPlanetPosition(time, JplData.JUPITER_JPL);
-      case JplData.Saturn  => calcPlanetPosition(time, JplData.SATURN_JPL);
-    }
-    val earth = calcEarthPosition(time);
-    VectorLib.minus(target, earth);
-  }
-
-}
 
 object StringLib {
   def parseContent(content: String): (String, Option[String], List[String], List[String]) = {
@@ -221,434 +64,7 @@ object StringLib {
   }
 }
 
-object VectorLib {
-
-  def minus(a: Array[Double], b: Array[Double]): Array[Double] = {
-    val ret = new Array[Double](3);
-    ret(0) = a(0) - b(0);
-    ret(1) = a(1) - b(1);
-    ret(2) = a(2) - b(2);
-    ret;
-  }
-
-  def multiplyMV(m: Array[Double], v: Array[Double]): Array[Double] = {
-    val ret = new Array[Double](3);
-    ret(0) = m(0) * v(0) + m(1) * v(1) + m(2) * v(2);
-    ret(1) = m(3) * v(0) + m(4) * v(1) + m(5) * v(2);
-    ret(2) = m(6) * v(0) + m(7) * v(1) + m(8) * v(2);
-    ret;
-  }
-
-  def distance(v: Array[Double]): Double = {
-    val x = v(0);
-    val y = v(1);
-    val z = v(2);
-    Math.sqrt(x * x + y * y + z * z);
-  }
-
-  def angularDistance1(xyz1: Array[Double], xyz2: Array[Double]): Double = {
-    val x1 = xyz1(0);
-    val y1 = xyz1(1);
-    val z1 = xyz1(2);
-    val x2 = xyz2(0);
-    val y2 = xyz2(1);
-    val z2 = xyz2(2);
-    (x1 * x2 + y1 * y2 + z1 * z2) / Math.sqrt((x1 * x1 + y1 * y1 + z1 * z1) * (x2 * x2 + y2 * y2 + z2 * z2));
-  }
-
-  def angularDistance(xyz1: Array[Double], xyz2: Array[Double]): Double = {
-    Math.acos(angularDistance1(xyz1, xyz2));
-  }
-
-  val unitMatrix: Array[Double] = {
-    val m = new Array[Double](9);
-    m(0) = 1.0;
-    m(4) = 1.0;
-    m(8) = 1.0;
-    m;
-  }
-
-  def rotateMatrixX(th: Double, r: Array[Double]): Array[Double] = {
-    val cos = Math.cos(th);
-    val sin = Math.sin(th);
-    val ret = new Array[Double](9);
-    ret(0) = r(0);
-    ret(1) = r(1);
-    ret(2) = r(2);
-    ret(3) =  cos * r(3) - sin * r(6);
-    ret(4) =  cos * r(4) - sin * r(7);
-    ret(5) =  cos * r(5) - sin * r(8);
-    ret(6) =  sin * r(3) + cos * r(6);
-    ret(7) =  sin * r(4) + cos * r(7);
-    ret(8) =  sin * r(5) + cos * r(8);
-    ret;
-  }
-
-  def rotateMatrixY(th: Double, r: Array[Double]): Array[Double] = {
-    val cos = Math.cos(th);
-    val sin = Math.sin(th);
-    val ret = new Array[Double](9);
-    ret(0) =  cos * r(0) + sin * r(6);
-    ret(1) =  cos * r(1) + sin * r(7);
-    ret(2) =  cos * r(2) + sin * r(8);
-    ret(3) =  r(3);
-    ret(4) =  r(4);
-    ret(5) =  r(5);
-    ret(6) = -sin * r(0) + cos * r(6);
-    ret(7) = -sin * r(1) + cos * r(7);
-    ret(8) = -sin * r(2) + cos * r(8);
-    ret;
-  }
-
-  def rotateMatrixZ(th: Double, r: Array[Double]): Array[Double] = {
-    val cos = Math.cos(th);
-    val sin = Math.sin(th);
-    val ret = new Array[Double](9);
-    ret(0) =  cos * r(0) - sin * r(3);
-    ret(1) =  cos * r(1) - sin * r(4);
-    ret(2) =  cos * r(2) - sin * r(5);
-    ret(3) =  sin * r(0) + cos * r(3);
-    ret(4) =  sin * r(1) + cos * r(4);
-    ret(5) =  sin * r(2) + cos * r(5);
-    ret(6) =  r(6);
-    ret(7) =  r(7);
-    ret(8) =  r(8);
-    ret;
-  }
-
-  def xyzToLng(xyz: Array[Double]): Double = {
-    val x = xyz(0);
-    val y = xyz(1);
-    val lng = Math.atan2(y, x);
-    if (lng < 0) lng + PI2 else lng;
-  }
-
-  def xyzToLat(xyz: Array[Double]): Double = {
-    val x = xyz(0);
-    val y = xyz(1);
-    val z = xyz(2);
-    val r = Math.sqrt(x * x + y * y);
-    val lat = Math.atan2(z, r);
-    lat;
-  }
-
-  def calcLngDiff(lng1: Double, lng2: Double): Double = {
-    val d = lng1 - lng2;
-    if (d < 0) d + PI2 else d;
-  }
-
-}
-
-object Bpn {
-
-  private def calcGamma(time: Double): Double = {
-    val jc = (time - 51544.5) / 36525.0;
-    (-0.052928    +
-    (10.556378    +
-    ( 0.4932044   +
-    (-0.00031238  +
-    (-0.000002788 +
-    ( 0.0000000260)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
-  }
-
-  private def calcPhi(time: Double): Double = {
-    val jc = (time - 51544.5) / 36525.0;
-    (84381.412819    +
-    (  -46.811016    +
-    (    0.0511268   +
-    (    0.00053289  +
-    (   -0.000000440 +
-    (   -0.0000000176)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
-  }
-
-  private def calcPsi(time: Double): Double = {
-    val jc = (time - 51544.5) / 36525.0;
-    (  -0.041775    +
-    (5038.481484    +
-    (   1.5584175   +
-    (  -0.00018522  +
-    (  -0.000026452 +
-    (  -0.0000000148)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
-  }
-
-  private def calcEps(time: Double): Double = {
-    val jc = (time - 51544.5) / 36525.0;
-    (84381.406        +
-    (  -46.836769     +
-    (   -0.0001831    +
-    (    0.00200340   +
-    (   -5.76 * 10e-7 +
-    (   -4.34 * 10e-8)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
-  }
-
-  val icrsToJ2000Matrix: Array[Double] = {
-    var r: Array[Double] = VectorLib.unitMatrix;
-    r = VectorLib.rotateMatrixX(  5.1 / 1000 / 3600 / PI57, r);
-    r = VectorLib.rotateMatrixY( 17.3 / 1000 / 3600 / PI57, r);
-    r = VectorLib.rotateMatrixZ(-78.0 / 1000 / 3600 / PI57, r);
-    r;
-  }
-
-  val icrsToMeanEclipticMatrix2000: Array[Double] = {
-    icrsToMeanEclipticMatrix(TimeLib.stringToModifiedJulianDay("2000-01-01T00:00:00+00:00"));
-  }
-
-  // ICRS座標系から平均黄道座標系に変換
-  def icrsToMeanEclipticMatrix(time: Double): Array[Double] = {
-    val gamma = calcGamma(time);
-    val phi = calcPhi(time);
-    val psi = calcPsi(time);
-    var r: Array[Double] = VectorLib.unitMatrix;
-    r = VectorLib.rotateMatrixZ(-gamma, r);
-    r = VectorLib.rotateMatrixX(-phi, r);
-    r = VectorLib.rotateMatrixZ(psi, r);
-    r;
-  }
-
-  // ICRS座標系から平均赤道座標系に変換
-  def icrsToMeanEquatorialMatrix(time: Double): Array[Double] = {
-    val eps = calcEps(time);
-    var r: Array[Double] = icrsToMeanEclipticMatrix(time);
-    r = VectorLib.rotateMatrixX(eps, r);
-    r;
-  }
-
-  // ICRS座標系から真黄道座標系に変換
-  private def icrsToTrueEclipticMatrix(time: Double, nutation: (Double, Double)): Array[Double] = {
-    val gamma = calcGamma(time);
-    val phi = calcPhi(time);
-    val psi = calcPsi(time);
-    val (dpsi, deps) = nutation;
-    var r: Array[Double] = VectorLib.unitMatrix;
-    r = VectorLib.rotateMatrixZ(-gamma, r);
-    r = VectorLib.rotateMatrixX(-phi, r);
-    r = VectorLib.rotateMatrixZ(psi + dpsi, r);
-    r;
-  }
-
-  // ICRS座標系から真黄道座標系に変換
-  def icrsToTrueEclipticMatrix(time: Double): Array[Double] = {
-    val nutation = calcNutation(time);
-    icrsToTrueEclipticMatrix(time, nutation);
-  }
-
-  // ICRS座標系から真赤道座標系に変換
-  def icrsToTrueEquatorialMatrix(time: Double): Array[Double] = {
-    val nutation = calcNutation(time);
-    val (dpsi, deps) = nutation;
-    val eps = calcEps(time);
-    var r: Array[Double] = icrsToTrueEclipticMatrix(time, nutation);
-    r = VectorLib.rotateMatrixX(eps + deps, r);
-    r;
-  }
-
-  // 章動
-  private def calcNutation(time: Double): (Double, Double) = {
-    val jc = (time - 51544.5) / 36525.0;
-    val fj2 = -2.7774e-6 * jc;
-    val nl = calcNutationLuniSolar(jc);
-    val np = calcNutationPlanetary(jc);
-    val dpsi = (nl._1 + np._1) * (1.0 + 0.4697e-6 * fj2);
-    val deps = (nl._2 + np._2) * (1.0 + fj2);
-    (dpsi, deps);
-  }
-
-  // 日月章動
-  private def calcNutationLuniSolar(jc: Double): (Double, Double) = {
-    val l_iers2003 =
-      (    485868.249036  +
-      (1717915923.2178    +
-      (        31.8792    +
-      (         0.051635  +
-      (        -0.00024470)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
-    val lp_mhb2000 =
-      (  1287104.79305   +
-      (129596581.0481    +
-      (       -0.5532    +
-      (        0.000136  +
-      (       -0.00001149)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
-    val f_iers2003 =
-      (     335779.526232 +
-      (1739527262.8478    +
-      (       -12.7512    +
-      (        -0.001037  +
-      (         0.00000417)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
-    val d_mhb2000 =
-      (   1072260.70369   +
-      (1602961601.2090    +
-      (        -6.3706    +
-      (         0.006593  +
-      (        -0.00003169)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
-    val om_iers2003 =
-      (  450160.398036  +
-      (-6962890.5431    +
-      (       7.4722    +
-      (       0.007702  +
-      (      -0.00005939)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
-
-    var dpsi: Double = 0.0;
-    var deps: Double = 0.0;
-    var i: Int = nutLsData.size - 1;
-    while (i >= 0) {
-      var d = nutLsData(i);
-      val arg = (d(0) * l_iers2003 +
-                 d(1) * lp_mhb2000 +
-                 d(2) * f_iers2003 +
-                 d(3) * d_mhb2000 +
-                 d(4) * om_iers2003) % PI2;
-      val sin = Math.sin(arg);
-      val cos = Math.cos(arg);
-      dpsi = dpsi + (d(5) + d(6) * jc) * sin + d(7) * cos;
-      deps = deps + (d(8) + d(9) * jc) * cos + d(10) * sin;
-      i = i - 1;
-    }
-    (dpsi, deps);
-  }
-
-  // 惑星章動
-  private def calcNutationPlanetary(jc: Double): (Double, Double) = {
-    val l_mhb2000 =
-      (   2.35555598  +
-      (8328.6914269554)
-      * jc) % PI2;
-    val f_mhb2000 =
-      (   1.627905234 +
-      (8433.466158131)
-      * jc) % PI2;
-    val d_mhb2000_2 =
-      (   5.198466741 +
-      (7771.3771468121)
-      * jc) % PI2;
-    val om_mhb2000 =
-      (  2.18243920 +
-      (-33.757045)
-      * jc) % PI2;
-    val pa_iers2003 =
-      (0.024381750 +
-      (0.00000538691)
-      * jc) * jc % PI2;
-    val lme_iers2003 =
-      (   4.402608842 +
-      (2608.7903141574)
-      * jc) % PI2;
-    val lve_iers2003 =
-      (   3.176146697 +
-      (1021.3285546211)
-      * jc) % PI2;
-    val lea_iers2003 =
-      (  1.753470314 +
-      (628.3075849991)
-      * jc) % PI2;
-    val lma_iers2003 =
-      (  6.203480913 +
-      (334.0612426700)
-      * jc) % PI2;
-    val lju_iers2003 =
-      ( 0.599546497 +
-      (52.9690962641)
-      * jc) % PI2;
-    val lsa_iers2003 =
-      ( 0.874016757 +
-      (21.3299104960)
-      * jc) % PI2;
-    val lur_iers2003 =
-      (5.481293872 +
-      (7.4781598567)
-      * jc) % PI2;
-    val lne_mhb2000 =
-      (5.321159000 +
-      (3.8127774000)
-      * jc) % PI2;
-
-
-    var dpsi: Double = 0.0;
-    var deps: Double = 0.0;
-    var i: Int = nutPlData.size - 1;
-    while (i >= 0) {
-      var d = nutPlData(i);
-      val arg = (d(0) * l_mhb2000 +
-                 d(2) * f_mhb2000 +
-                 d(3) * d_mhb2000_2 +
-                 d(4) * om_mhb2000 +
-                 d(13) * pa_iers2003 +
-                 d(5) * lme_iers2003 +
-                 d(6) * lve_iers2003 +
-                 d(7) * lea_iers2003 +
-                 d(8) * lma_iers2003 +
-                 d(9) * lju_iers2003 +
-                 d(10) * lsa_iers2003 +
-                 d(11) * lur_iers2003 +
-                 d(12) * lne_mhb2000) % PI2;
-      val sin = Math.sin(arg);
-      val cos = Math.cos(arg);
-      dpsi = dpsi + d(14) * sin + d(15) * cos;
-      deps = deps + d(17) * cos + d(16) * sin;
-      i = i - 1;
-    }
-    (dpsi, deps);
-  }
-
-  private def loadNutLs(): IndexedSeq[IndexedSeq[Double]] = {
-    // L L' F D Om   PS PST PC EC ECT ES
-    val data1 = {
-      val sc = new java.util.Scanner(new java.io.BufferedInputStream(new java.io.FileInputStream(nutLsDataPath)));
-      val data1 = scala.collection.mutable.ArrayBuffer[String]();
-      while (sc.hasNext) {
-        data1 += sc.next();
-      }
-      sc.close();
-      data1;
-    }
-    val count = data1.size / 11;
-    val data2: IndexedSeq[IndexedSeq[Double]] = (0 until count).map { i =>
-      (0 until 11).map { j =>
-        if (j < 5) {
-          data1(i * 11 + j).toDouble;
-        } else {
-          data1(i * 11 + j).toDouble * 0.001 * PI_AS2R;
-        }
-      }
-    }
-    data2;
-  }
-
-  private def loadNutPl(): IndexedSeq[IndexedSeq[Double]] = {
-    // L L' F D Om Lm Lv Le LM Lj Ls Lu Ln Pa   PS PC ES EC
-    val data1 = {
-      val sc = new java.util.Scanner(new java.io.BufferedInputStream(new java.io.FileInputStream(nutPlDataPath)));
-      val data1 = scala.collection.mutable.ArrayBuffer[String]();
-      while (sc.hasNext) {
-        data1 += sc.next();
-      }
-      sc.close();
-      data1;
-    }
-    val count = data1.size / 18;
-    val data2: IndexedSeq[IndexedSeq[Double]] = (0 until count).map { i =>
-      (0 until 18).map { j =>
-        if (j < 14) {
-          data1(i * 18 + j).toDouble;
-        } else {
-          data1(i * 18 + j).toDouble * 0.001 * PI_AS2R;
-        }
-      }
-    }
-    data2;
-  }
-
-  private val nutLsData: IndexedSeq[IndexedSeq[Double]] = loadNutLs();
-  private val nutPlData: IndexedSeq[IndexedSeq[Double]] = loadNutPl();
-
-}
+val bpn = new Bpn(nutLsDataPath, nutPlDataPath);
 
 class Hcs(lng: Double, lat: Double) {
 
@@ -911,7 +327,7 @@ object Words {
       val altHor = -0.90 / PI57;
       val time = startTime + day + 21.0 / 24;
       val tdb = TimeLib.mjdutcToTdb(time);
-      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+      val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt < altHor) {
@@ -1083,13 +499,13 @@ val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, td
     val time = Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val tdb = TimeLib.mjdutcToTdb(time);
       val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+      val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
       val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(sun2, time);
       alt;
     }
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     (time, tdb, bpnMatrix);
   }
 }
@@ -1106,7 +522,7 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
 def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Array[Double], Double, Double) = {
   val tdb = TimeLib.mjdutcToTdb(time);
   val ut1 = time; // 近似的
-  val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+  val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
   val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
   val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
   val azialt = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -1299,7 +715,7 @@ def calcMoonLng(time: Double): Double = {
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val moon = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
-  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+  val bpnMatrix = bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
   val sunLng = VectorLib.xyzToLng(sun2);
@@ -1388,7 +804,7 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
   } else {
     val time21 = time.toInt + 0.5;
     val tdb21 = TimeLib.mjdutcToTdb(time21);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb21);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb21);
     val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
     val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time21);
     if (alt >= altThres0) {
@@ -1568,7 +984,7 @@ def calcSunLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+  val bpnMatrix = bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
   sunLng;
@@ -1577,7 +993,7 @@ def calcSunLng2(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
+  val bpnMatrix = bpn.icrsToMeanEclipticMatrix2000;
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
   sunLng;
@@ -1710,7 +1126,7 @@ def calcSunLng2(time: Double): Double = {
     if (isNightTime2(time)) {
       val tdb = TimeLib.mjdutcToTdb(time);
       val xyz = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
-      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+      val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres0) {
@@ -1794,7 +1210,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     val tdb = TimeLib.mjdutcToTdb(utc);
     val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
     val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEclipticMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
     val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
     val sunLng = VectorLib.xyzToLng(sun2);
@@ -1852,7 +1268,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     val tdb = TimeLib.mjdutcToTdb(utc);
     val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
     val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
     val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
     val sunLng = VectorLib.xyzToLng(sun2);
@@ -2272,7 +1688,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       if (flag > 0 && isNightTime2(time)) {
         val tdb = TimeLib.mjdutcToTdb(time);
         val xyz_f = fastStarXyzFunc(tdb);
-        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+        val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
         val xyz_f2 = VectorLib.multiplyMV(bpnMatrix, xyz_f);
         val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz_f2, time);
         if (alt >= altThres0) {
@@ -2528,7 +1944,7 @@ tweetMoonRiseSet();
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -2549,7 +1965,7 @@ tweetMoonRiseSet();
     val decThres = - PI5 + tokyoLat + 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.flatMap { constellation =>
       if (constellation.dec < decThres) {
         val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
@@ -2580,7 +1996,7 @@ tweetMoonRiseSet();
     //val altThres = 0.0;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = (constellationData.starData.flatMap { case (ra, xyz, name, hashtags) =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -2612,7 +2028,7 @@ tweetMoonRiseSet();
     //val altThres = 0.0;
     val time = sunsetTimes(day);
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations0 = ((constellationData.starData2.flatMap { case (ra, xyz, magnitude, name, hashtags) =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -2659,7 +2075,7 @@ tweetMoonRiseSet();
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.filter(_.eclipticalFlag).flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -2688,7 +2104,7 @@ tweetMoonRiseSet();
     val altThres = 30.0 / PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.filter(_.galaxyFlag).flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
