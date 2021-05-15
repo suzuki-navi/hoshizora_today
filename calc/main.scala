@@ -378,7 +378,7 @@ class Words(constellationData: Constellations) {
   private var history: Map[String, (List[Int], Int)] = Map.empty;
   private var contents: Map[String, IndexedSeq[Words.LunchTimeContent]] = Map.empty;
 
-  val periodStart: Int = 90; // PERIOD
+  val periodStart: Int = 104; // PERIOD
 
   def loadHistory(path: String): Unit = {
     history = Map.empty;
@@ -905,6 +905,7 @@ case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[Tweet
   sunsetTweets: List[OnSunsetTweetContent],
   nightTweets: List[TweetContent]) {
   def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && daytimeTweets.isEmpty && nightTweets.isEmpty;
+  def size: Int = otherTweets.size + daytimeTweets.size + nightTweets.size + (if (sunsetTweets.isEmpty) 0 else 1);
   def added(tc: TweetContent): DateTweets = {
     tc match {
       case tc: OnSunsetTweetContent =>
@@ -2308,7 +2309,7 @@ tweetMoonRiseSet();
   putTweetLunchTimeContents();
 
   (words.periodStart until period).foreach { day =>
-    if (!getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+    if (getTweets(startTime + day).size < 3 || !getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       words.putTweetWord(day);
     }
   }
