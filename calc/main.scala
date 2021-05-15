@@ -1,5 +1,7 @@
 import java.time.OffsetDateTime;
 
+object Main {
+
 // PERIOD
 val startTime = TimeLib.stringToModifiedJulianDay("2021-01-31T00:00:00+09:00");
 val startTime1 = TimeLib.stringToModifiedJulianDay("2021-05-12T00:00:00+09:00");
@@ -3521,3 +3523,8 @@ scala.util.Using(new java.io.PrintWriter(new java.io.FileOutputStream(dataPath))
 }
 
 //==============================================================================
+
+  def main(args: Array[String]): Unit = {
+  }
+}
+

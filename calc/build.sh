@@ -6,7 +6,7 @@ cd $(dirname $0)
 
 echo "Starting calculating..."
 
-time scala -deprecation ./main.scala
+time sbt run
 
 echo "Finished calculating..."
 
