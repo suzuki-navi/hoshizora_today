@@ -1,7 +1,7 @@
 
 object MathLib {
 
-  def circleAdd(a: Double, b: Double): Double = {
+  def circleAdd(a: Double, b: Double): Double = { // TODO 削除したい
     val d = a + b;
     if (d >= 3 * PI) {
       d - 2 * PI2;
@@ -9,6 +9,18 @@ object MathLib {
       d - PI2;
     } else if (d < -3 * PI) {
       d + 2 * PI2;
+    } else if (d < -PI) {
+      d + PI2;
+    } else {
+      d;
+    }
+  }
+
+  // 0~2pi - 0~2pi => -pi~+pi
+  def circleDiff1(a: Double, b: Double): Double = {
+    val d = a - b;
+    if (d >= PI) {
+      d - PI2;
     } else if (d < -PI) {
       d + PI2;
     } else {
