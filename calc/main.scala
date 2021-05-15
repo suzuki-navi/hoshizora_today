@@ -268,7 +268,8 @@ class Constellations {
             val (ra, dec, xyz) = calcDecXyz(raStr, decStr);
             val p = content.indexOf("座");
             val word = content.substring(0, p + 1);
-            lunchTimeContents2 = Words.ConstellationLunchTimeContent(word, content, urlOpt, hashtags, ra, dec, xyz) :: lunchTimeContents2;
+            val hashtags2 = hashtags ::: word :: "星座" :: Nil;
+            lunchTimeContents2 = Words.ConstellationLunchTimeContent(word, content, urlOpt, hashtags2, ra, dec, xyz) :: lunchTimeContents2;
           case AreaPattern(decStr, content) =>
             val lngH = raStr.substring(0, 2).toInt;
             val lngM = raStr.substring(3, 5).toInt / 20 * 20;
