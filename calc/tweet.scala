@@ -33,23 +33,16 @@ case class LegacyTweetContent(time: Double, message: String,
   def hashtags: List[String] = Nil;
 }
 
-case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[TweetContent],
-  sunsetTweets: List[Main.OnSunsetTweetContent],
-  nightTweets: List[TweetContent]) {
-  def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && daytimeTweets.isEmpty && nightTweets.isEmpty;
-  def size: Int = otherTweets.size + daytimeTweets.size + nightTweets.size + (if (sunsetTweets.isEmpty) 0 else 1);
+case class DateTweets(otherTweets: List[TweetContent],
+  sunsetTweets: List[Main.OnSunsetTweetContent]) {
+  def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty;
+  def size: Int = otherTweets.size + (if (sunsetTweets.isEmpty) 0 else 1);
   def added(tc: TweetContent): DateTweets = {
     tc match {
       case tc: Main.OnSunsetTweetContent =>
         this.copy(sunsetTweets = tc :: this.sunsetTweets);
       case _ =>
-        if (DateTweets.isDayTime(tc.time)) {
-          this.copy(daytimeTweets = tc :: this.daytimeTweets);
-        } else if (Main.isNightTime0(tc.time)) {
-          this.copy(nightTweets = tc :: this.nightTweets);
-        } else {
-          this.copy(otherTweets = tc :: this.otherTweets);
-        }
+        this.copy(otherTweets = tc :: this.otherTweets);
     }
   }
   def removed(time: Double, message: String): DateTweets = {
@@ -57,26 +50,35 @@ case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[Tweet
       TimeLib.timeToDateTimeString(tc.time) == TimeLib.timeToDateTimeString(time) &&
       tc.message == message;
     }
-    if ((otherTweets ::: daytimeTweets ::: sunsetTweets ::: nightTweets).exists(p)) {
-      DateTweets(otherTweets.filter(!p(_)), daytimeTweets.filter(!p(_)),
-        sunsetTweets.filter(!p(_)), nightTweets.filter(!p(_)));
+    if (sunsetTweet.nonEmpty && p(sunsetTweet.get)) {
+      this.copy(sunsetTweets = Nil);
+    } else if (otherTweets.exists(p)) {
+      this.copy(otherTweets = otherTweets.filter(!p(_)));
     } else {
       added(LegacyTweetContent(time, "#-" + message, None, Nil));
     }
   }
+  val sunsetTweet: Option[TweetContent] = {
+    if (sunsetTweets.isEmpty) {
+      None;
+    } else if (sunsetTweets.tail.isEmpty) {
+      Some(sunsetTweets.head);
+    } else {
+      Some(Main.MultiSunsetTweetContent(sunsetTweets.head.day, sunsetTweets.reverse));
+    }
+  }
   def tweets: List[TweetContent] = {
     import Ordering.Double.IeeeOrdering;
-    ((if (sunsetTweets.isEmpty) {
-      Nil;
-    } else if (sunsetTweets.tail.isEmpty) {
-      sunsetTweets.head :: Nil;
-    } else {
-      Main.MultiSunsetTweetContent(sunsetTweets.head.day, sunsetTweets.reverse) :: Nil;
-    }) ::: otherTweets ::: daytimeTweets ::: nightTweets).sortBy(_.time);
+    (sunsetTweet match {
+      case Some(sunsetTweet) => sunsetTweet :: otherTweets;
+      case None => otherTweets;
+    }).sortBy(_.time);
   }
 }
 
 object DateTweets {
+
+  def apply(): DateTweets = DateTweets(Nil, Nil);
 
   def isDayTime(time: Double): Boolean = {
     val day = (time - Main.startTime).toInt;

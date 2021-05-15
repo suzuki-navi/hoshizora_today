@@ -805,7 +805,7 @@ def isNightTime0(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
   //time - time.toInt >= 5.0 / 24 && time - time.toInt < 15.0 / 24;
-  time >= s && time - time.toInt < 14.0 / 24;
+  time > s && time - time.toInt < 14.0 / 24;
 }
 
 def isNightTime2(time: Double): Boolean = {
@@ -865,12 +865,12 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
 
 var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
   val date = TimeLib.timeToDateString(startTime + day);
-  (date, DateTweets(Nil, Nil, Nil, Nil));
+  (date, DateTweets());
 }.toMap;
 
 def getTweets(time: Double): DateTweets = {
   val date = TimeLib.timeToDateString(time);
-  _tweets.getOrElse(date, DateTweets(Nil, Nil, Nil, Nil));
+  _tweets.getOrElse(date, DateTweets());
 }
 
 def putTweet(tc: TweetContent): Unit = {
@@ -1755,7 +1755,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   val altThres = 10 / PI57;
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
-    if (!getTweets(time).nightTweets.flatMap(_.starNames).contains("月")) {
+    if (!getTweets(time).tweets.filter(tc => isNightTime0(tc.time)).flatMap(_.starNames).contains("月")) {
       {
         val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
         if (alt >= altThres) {
