@@ -794,12 +794,6 @@ val outerPlanetsNightAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = oute
 
 //==============================================================================
 
-def isDayTime(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
-  val s = sunsetTimes(day);
-  time - time.toInt >= 0.0 / 24 && time < s; // 9時～日没
-}
-
 def isLunchTime(time: Double): Boolean = {
   val day = (time - startTime).toInt;
   val s = sunsetTimes(day);
@@ -868,83 +862,6 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
 //==============================================================================
 // ツイート管理
 //==============================================================================
-
-sealed trait TweetContent {
-  def time: Double;
-  def message: String;
-  def urlOpt: Option[String] = None;
-  def hashtags: List[String];
-  def starNames: List[String];
-
-  def date: String = TimeLib.timeToDateString(time);
-  def tweetContent: String = {
-    val (msg, length) = urlOpt match {
-      case None      =>
-        val msg = message + hashtags.map(" #" + _).mkString;
-        val length = msg.length;
-        (msg, length);
-      case Some(url) =>
-        val msg = message + " " + url + hashtags.map(" #" + _).mkString;
-        val length = msg.length - url.length - 1 + 12;
-        (msg, length);
-    }
-    if (msg.indexOf("ERROR") >= 0) {
-      "#" + msg;
-    } else if (length > 140) {
-      "#TOO_LONG(%d) %s".format(length, msg);
-    } else {
-      msg;
-    }
-  }
-}
-
-case class LegacyTweetContent(time: Double, message: String,
-  override val urlOpt: Option[String], starNames: List[String]) extends  TweetContent {
-  def hashtags: List[String] = Nil;
-}
-
-case class DateTweets(otherTweets: List[TweetContent], daytimeTweets: List[TweetContent],
-  sunsetTweets: List[OnSunsetTweetContent],
-  nightTweets: List[TweetContent]) {
-  def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty && daytimeTweets.isEmpty && nightTweets.isEmpty;
-  def size: Int = otherTweets.size + daytimeTweets.size + nightTweets.size + (if (sunsetTweets.isEmpty) 0 else 1);
-  def added(tc: TweetContent): DateTweets = {
-    tc match {
-      case tc: OnSunsetTweetContent =>
-        this.copy(sunsetTweets = tc :: this.sunsetTweets);
-      case _ =>
-        if (isDayTime(tc.time)) {
-          this.copy(daytimeTweets = tc :: this.daytimeTweets);
-        } else if (isNightTime0(tc.time)) {
-          this.copy(nightTweets = tc :: this.nightTweets);
-        } else {
-          this.copy(otherTweets = tc :: this.otherTweets);
-        }
-    }
-  }
-  def removed(time: Double, message: String): DateTweets = {
-    def p(tc: TweetContent): Boolean = {
-      TimeLib.timeToDateTimeString(tc.time) == TimeLib.timeToDateTimeString(time) &&
-      tc.message == message;
-    }
-    if ((otherTweets ::: daytimeTweets ::: sunsetTweets ::: nightTweets).exists(p)) {
-      DateTweets(otherTweets.filter(!p(_)), daytimeTweets.filter(!p(_)),
-        sunsetTweets.filter(!p(_)), nightTweets.filter(!p(_)));
-    } else {
-      added(LegacyTweetContent(time, "#-" + message, None, Nil));
-    }
-  }
-  def tweets: List[TweetContent] = {
-    import Ordering.Double.IeeeOrdering;
-    ((if (sunsetTweets.isEmpty) {
-      Nil;
-    } else if (sunsetTweets.tail.isEmpty) {
-      sunsetTweets.head :: Nil;
-    } else {
-      MultiSunsetTweetContent(sunsetTweets.head.day, sunsetTweets.reverse) :: Nil;
-    }) ::: otherTweets ::: daytimeTweets ::: nightTweets).sortBy(_.time);
-  }
-}
 
 var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
   val date = TimeLib.timeToDateString(startTime + day);
@@ -2246,7 +2163,7 @@ tweetMoonRiseSet();
         val msg = lunchTimeContents(index)._2;
         {
           val p = (day1 until (day2 + 14)).indexWhere { d =>
-            getTweets(startTime + d).daytimeTweets.isEmpty;
+            !getTweets(startTime + d).tweets.exists(tc => DateTweets.isDayTime(tc.time));
           }
           day1 = if (p < 0) day1 else day1 + p;
         }
@@ -2329,7 +2246,7 @@ tweetMoonRiseSet();
       //if (getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
       if (getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
         putTweet(time + 23.0 / 24, "#night empty");
-      } else if (getTweets(time).daytimeTweets.isEmpty) {
+      } else if (!getTweets(time).tweets.exists(tc => DateTweets.isDayTime(tc.time))) {
         putTweet(time + 9.0 / 24, "#daytime empty");
       }
     }
