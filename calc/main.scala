@@ -580,14 +580,6 @@ val moonRiseSetTimesDataTouch: Array[Boolean] = new Array[Boolean](moonRiseSetTi
 
 def touchMoonRiseSetStr(time0: Double): Option[String] = {
   val p = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._1 - time0);
-  val newMoonTime = {
-    val moonPhaseTerms2 = moonPhaseTerms.filter(_._2 == 0);
-    val idx = MathLib.binarySearchBy(moonPhaseTerms2)(t => t._1 - time0);
-    if (idx <= 0) {
-      return Some("ERROR");
-    }
-    moonPhaseTerms2(idx - 1)._1;
-  }
   def isNextDay(time: Double): Boolean = {
     (time0 + 9.0 / 24).toInt < (time + 9.0 / 24).toInt;
   }
@@ -596,44 +588,10 @@ def touchMoonRiseSetStr(time0: Double): Option[String] = {
     Some("ERROR");
   } else if (moonRiseSetTimesData(p)._1 - time0 > 8.0 / 24) {
     None;
-  } else if (p == 0 || p >= moonRiseSetTimesData.size - 1) {
-    Some("ERROR");
   } else {
     moonRiseSetTimesDataTouch(p) = true;
     val data = moonRiseSetTimesData(p);
-    val data_b = moonRiseSetTimesData(p - 1);
-    val data_a = moonRiseSetTimesData(p + 1);
-    val moonPhase = calcMoonPhase(data._2);
-    val moonPhaseRatio = 100.0 * calcMoonPhaseRatio(data._2);
-    val moonDayCount = data._2 - newMoonTime;
-    val phaseStr = if (data._5 == 0) {
-      if (moonPhase < 14.0) {
-        "、新月\uD83C\uDF11直後";
-      } else {
-        "、新月\uD83C\uDF11直前";
-      }
-    } else if (data._5 == 1) {
-      "、新月と上弦の中間\uD83C\uDF12";
-    } else if (data._5 == 2) {
-      "\uD83C\uDF13";
-    } else if (data._5 == 3) {
-      "、上弦と満月の中間\uD83C\uDF14";
-    } else if (data._5 == 4) {
-      "\uD83C\uDF15";
-    } else if (data._5 == 5) {
-      "、満月と下弦の中間\uD83C\uDF16";
-    } else if (data._5 == 6) {
-      "\uD83C\uDF17";
-    } else if (data._5 == 7) {
-      "、下弦と新月の中間\uD83C\uDF18";
-    } else if (data_a._5 == 0) {
-      ""; // "、もうすぐ新月";
-    } else if (data_b._5 == 0) {
-      ""; // "、新月を過ぎたところ";
-    } else {
-      "";
-    }
-    val southStr = "月相%.1f/28、輝面比%.1f%%、月齢%.1f%s".format(moonPhase, moonPhaseRatio, moonDayCount, phaseStr);
+    val southStr = calcMoonPhaseString(data._2);
     val format = if (isNextDay(data._1)) {
       "翌日の月の出は%sごろ、南中は%sごろ(%s)、月の入りは%sごろ";
     } else if (isNextDay(data._2)) {
@@ -748,6 +706,57 @@ def calcMoonPhase(time: Double): Double = {
 }
 def calcMoonPhaseRatio(time: Double): Double = {
   0.5 * (1.0 - Math.cos(calcMoonLng(time)));
+}
+def calcMoonPhaseString(time: Double): String = {
+  val p = MathLib.binarySearchBy(moonRiseSetTimesData)(t => t._2 - time);
+  val phaseTerm = if (p >= 0 && p < moonRiseSetTimesData.size && moonRiseSetTimesData(p)._2 == time) moonRiseSetTimesData(p)._5 else -1;
+
+  val moonPhase = calcMoonPhase(time);
+  val moonPhaseRatio = 100.0 * calcMoonPhaseRatio(time);
+  val moonDayCountStr = {
+    val moonPhaseTerms2 = moonPhaseTerms.filter(_._2 == 0);
+    val idx = MathLib.binarySearchBy(moonPhaseTerms2)(t => t._1 - time);
+    if (idx <= 0) {
+      "ERROR";
+    } else {
+      val newMoonTime = moonPhaseTerms2(idx - 1)._1;
+      "月齢%.1f".format(time - newMoonTime);
+    }
+  }
+  val phaseStr = if (moonPhase > 27.6 || moonPhase > 27.0 && phaseTerm == 0) {
+    "、新月\uD83C\uDF11直前";
+  } else if (moonPhase < 0.4 || moonPhase < 1.0 && phaseTerm == 0) {
+    "、新月\uD83C\uDF11直後";
+  } else if (moonPhase < 1.75) {
+    "、新月後の細い月";
+  } else if (moonPhase < 2.75) {
+    "、三日月";
+  } else if (moonPhase > 3.1 && moonPhase < 3.9 || moonPhase > 2.5 && moonPhase < 4.5 && phaseTerm == 1) {
+    "、新月と上弦の中間\uD83C\uDF12";
+  } else if (moonPhase > 6.6 && moonPhase < 7.4 || moonPhase > 6.0 && moonPhase < 8.0 && phaseTerm == 2) {
+    "、上弦の月\uD83C\uDF13";
+  } else if (moonPhase > 6.0 && moonPhase <= 6.6) {
+    "、もうすぐ上弦の月";
+  } else if (moonPhase > 7.4 && moonPhase < 8.0) {
+    "、上弦を過ぎた月";
+  } else if (moonPhase > 10.1 && moonPhase < 10.9 || moonPhase > 9.5 && moonPhase < 11.5 && phaseTerm == 3) {
+    "、上弦と満月の中間\uD83C\uDF14";
+  } else if (moonPhase > 13.6 && moonPhase < 14.4 || moonPhase > 13.0 && moonPhase < 15.0 && phaseTerm == 4) {
+    "、満月\uD83C\uDF15";
+  } else if (moonPhase > 13.0 && moonPhase <= 13.6) {
+    "、もうすぐ満月";
+  } else if (moonPhase > 14.4 && moonPhase < 15.0) {
+    "、満月を過ぎた月";
+  } else if (moonPhase > 17.1 && moonPhase < 17.9 || moonPhase > 16.5 && moonPhase < 18.5 && phaseTerm == 5) {
+    "、満月と下弦の中間\uD83C\uDF16";
+  } else if (moonPhase > 20.6 && moonPhase < 21.4 || moonPhase > 20.0 && moonPhase < 22.0 && phaseTerm == 6) {
+    "、下弦の月\uD83C\uDF17";
+  } else if (moonPhase > 24.1 && moonPhase < 24.9 || moonPhase > 23.5 && moonPhase < 25.5 && phaseTerm == 7) {
+    "、下弦と新月の中間\uD83C\uDF18";
+  } else {
+    "";
+  }
+  "月相%.1f/28、輝面比%.1f%%、%s%s".format(moonPhase, moonPhaseRatio, moonDayCountStr, phaseStr);
 }
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
   MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
@@ -1677,16 +1686,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   }
   def moonPhaseStr: String = {
     if (fastStarName == "月") {
-      val moonPhase = calcMoonPhase(time);
-      val moonStr: String = {
-        val s = moonPhaseNaturalString(moonPhase);
-        if (s == "") {
-          s;
-        } else {
-          "。" + s + "です";
-        }
-      }
-      "。月相%.1f/28%s".format(moonPhase, moonStr);
+      "。%s".format(calcMoonPhaseString(time));
     } else {
       "";
     }
@@ -1853,17 +1853,8 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         case None => ;
         case Some((time, xyz, azi, alt)) =>
           val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
-          val moonPhase = calcMoonPhase(time);
-          val moonStr: String = {
-            val s = moonPhaseNaturalString(moonPhase);
-            if (s == "") {
-              s;
-            } else {
-              "。" + s + "です";
-            }
-          }
           val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
-          putTweet(time, "月は%s、%sにいます。月相%.1f/28%s".format(hcsStr, cons, moonPhase, moonStr) +
+          putTweet(time, "月は%s、%sにいます。%s".format(hcsStr, cons, calcMoonPhaseString(time)) +
             hashtags.map(" #" + _).mkString);
       }
     }
@@ -1908,7 +1899,6 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           case None => ;
           case Some((time, xyz, azi, alt)) =>
             val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
-            val moonPhase = calcMoonPhase(time);
             val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
             putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
               hashtags.map(" #" + _).mkString);
