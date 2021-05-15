@@ -1774,8 +1774,13 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         case Some((time, xyz, azi, alt)) =>
           val (cons, hashtags) = constellationData.icrsToConstellation(xyz);
           val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
-          putTweet(time, "月は%s、%sにいます。%s".format(hcsStr, cons, calcMoonPhaseString(time)) +
-            hashtags.map(" #" + _).mkString);
+          if (azi >= PI) {
+            putTweet(time, "月は%s、%sにいます。%s".format(hcsStr, cons, calcMoonPhaseString(time)) +
+              hashtags.map(" #" + _).mkString);
+          } else {
+            putTweet(time, "月は%s、%sにいます".format(hcsStr, cons) +
+              hashtags.map(" #" + _).mkString);
+          }
       }
     }
   }
