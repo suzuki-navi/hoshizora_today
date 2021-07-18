@@ -1354,28 +1354,34 @@ case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends On
   def starNames: List[String] = List("月");
 }
 case class SunsetPlanetTweetContent(day: Int, planetName: String,
-  azi: Double, alt: Double, isIncreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
+  azi: Double, alt: Double, isIncreasing: Boolean, isDecreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
   def alt360: Int = (alt * PI57 + 0.5).toInt;
   def message: String = if (isMax) {
     "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
   } else if (isIncreasing) {
     "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-  } else {
+  } else if (isDecreasing) {
     "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは西の空高度約%d°にいます".format(planetName, alt360);
   }
   def message2: String = if (isMax) {
     "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
   } else if (isIncreasing) {
     "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
-  } else {
+  } else if (isDecreasing) {
     "%sは日没時の高度を徐々に下げ、西の空高度約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは西の空高度約%d°にいます".format(planetName, alt360);
   }
   def message3: String = if (isMax) {
     "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
   } else if (isIncreasing) {
     "%sは日没時の高度を徐々に上げ、約%d°にいます".format(planetName, alt360);
-  } else {
+  } else if (isDecreasing) {
     "%sは日没時の高度を徐々に下げ、約%d°にいます".format(planetName, alt360);
+  } else {
+    "%sは約%d°にいます".format(planetName, alt360);
   }
   def hashtags: List[String] = List(planetName);
   def starNames: List[String] = List(planetName);
@@ -1444,7 +1450,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
     }.foreach { case (day, flag) =>
       if (flag > 0) {
         val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-        putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, true, true));
+        putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, false, false, true));
       }
     }
   }
@@ -1477,6 +1483,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
   val aziThres0 = 200 / PI57;
   val aziThres1 = 315 / PI57;
   val altThres0 = 10 / PI57;
+  val diffThreashold = 0.1 / PI57;
 
   val planets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
   innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
@@ -1487,8 +1494,9 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
         val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
         if (alt >= altThres0) {
           val prevAlt = innerPlanetsSunsetAziAltList(pi)(day - 1)._2;
-          val isIncreasing = (alt >= prevAlt);
-          putTweet(SunsetPlanetTweetContent(day, planet._1, azi, alt, isIncreasing, false));
+          val isIncreasing = (alt >= prevAlt + diffThreashold);
+          val isDecreasing = (alt <= prevAlt - diffThreashold);
+          putTweet(SunsetPlanetTweetContent(day, planet._1, azi, alt, isIncreasing, isDecreasing, false));
         }
       }
     }
@@ -1500,6 +1508,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
   val aziThres0 = 200 / PI57;
   val aziThres1 = 315 / PI57;
   val altThres0 = 10 / PI57;
+  val diffThreashold = 0.1 / PI57;
 
   val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
   val planets2 = IndexedSeq(("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn));
@@ -1511,8 +1520,9 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
           val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
           if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
             val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
-            val isIncreasing = (alt >= prevAlt);
-            putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, false));
+            val isIncreasing = (alt >= prevAlt + diffThreashold);
+            val isDecreasing = (alt <= prevAlt - diffThreashold);
+            putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, isDecreasing, false));
           }
         }
       };
