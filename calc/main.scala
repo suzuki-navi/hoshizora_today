@@ -4,8 +4,8 @@ object Main {
 // PERIOD
 val startTime = TimeLib.stringToModifiedJulianDay("2021-01-31T00:00:00+09:00");
 val startTime1 = TimeLib.stringToModifiedJulianDay("2021-07-18T00:00:00+09:00");
-val endTime1 = TimeLib.stringToModifiedJulianDay("2022-06-20T00:00:00+09:00");
-val endTime = TimeLib.stringToModifiedJulianDay("2022-06-20T00:00:00+09:00");
+val endTime1 = TimeLib.stringToModifiedJulianDay("2022-06-27T00:00:00+09:00");
+val endTime = TimeLib.stringToModifiedJulianDay("2022-06-27T00:00:00+09:00");
 
 val period = (endTime - startTime).toInt;
 
@@ -378,7 +378,7 @@ class Words(constellationData: Constellations) {
   private var history: Map[String, (List[Int], Int)] = Map.empty;
   private var contents: Map[String, IndexedSeq[Words.LunchTimeContent]] = Map.empty;
 
-  val periodStart: Int = 104; // PERIOD
+  val periodStart: Int = 168; // PERIOD 2021/07/18
 
   def loadHistory(path: String): Unit = {
     history = Map.empty;
@@ -2150,10 +2150,10 @@ tweetMoonRiseSet();
   // 星座の解説など
   def putTweetLunchTimeContents(): Unit = {
     val lunchTimeContents = constellationData.lunchTimeContents;
-    var day1: Int = 62; // PERIOD
-    var day2: Int = 62; // PERIOD
+    var day1: Int = 62; // PERIOD 2021/04/03
+    var day2: Int = day1;
     var index: Int = {
-      val time = startTime + day1 + 21.0 / 24.0; // PERIOD
+      val time = startTime + day1 + 21.0 / 24.0;
       val sid = hcs.siderealTimeFromUtc(time);
       val index = lunchTimeContents.indexWhere(_._1 > sid);
       if (index < 0) {
