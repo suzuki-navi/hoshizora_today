@@ -3,14 +3,14 @@ object MathLib {
 
   def circleAdd(a: Double, b: Double): Double = { // TODO 削除したい
     val d = a + b;
-    if (d >= 3 * PI) {
-      d - 2 * PI2;
-    } else if (d >= PI) {
-      d - PI2;
-    } else if (d < -3 * PI) {
-      d + 2 * PI2;
-    } else if (d < -PI) {
-      d + PI2;
+    if (d >= 3 * Const.PI) {
+      d - 2 * Const.PI2;
+    } else if (d >= Const.PI) {
+      d - Const.PI2;
+    } else if (d < -3 * Const.PI) {
+      d + 2 * Const.PI2;
+    } else if (d < -Const.PI) {
+      d + Const.PI2;
     } else {
       d;
     }
@@ -19,10 +19,10 @@ object MathLib {
   // 0~2pi - 0~2pi => -pi~+pi
   def circleDiff1(a: Double, b: Double): Double = {
     val d = a - b;
-    if (d >= PI) {
-      d - PI2;
-    } else if (d < -PI) {
-      d + PI2;
+    if (d >= Const.PI) {
+      d - Const.PI2;
+    } else if (d < -Const.PI) {
+      d + Const.PI2;
     } else {
       d;
     }
@@ -221,7 +221,7 @@ object MathLib {
   }
 
   def findCyclicPhaseListContinuous(cycle: Int, start: Int, end: Int, step: Int)(f: Double => Double): IndexedSeq[(Double, Int)] = {
-    val cycle_r = PI2R * cycle;
+    val cycle_r = Const.PI2R * cycle;
     val cycle2 = cycle * 0.5;
     val fs = (0 until cycle).map { i =>
       { x: Int =>
@@ -306,10 +306,6 @@ object MathLib {
   private def findCrossing(sv: Double, tv: Double): Double = {
     -sv / (tv - sv);
   }
-
-  private val PI = Math.PI;
-  private val PI2 = Math.PI * 2.0;
-  private val PI2R = 1.0 / PI2;
 
 }
 

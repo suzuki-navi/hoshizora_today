@@ -134,7 +134,7 @@ object TimeLib {
   // UT1から平均恒星時に変換
   def mjdut1ToGmst(time: Double): Double = {
     val r = 0.280191 + gmstK * (time - 59215.0);
-    PI2 * (if (r < 0) {
+    Const.PI2 * (if (r < 0) {
       r + 1 - r.toInt;
     } else {
       r - r.toInt;
@@ -143,10 +143,8 @@ object TimeLib {
 
   def gmstToMjdut1(sid: Double, time0: Double): Double = {
     val d = MathLib.circleAdd(sid, -mjdut1ToGmst(time0));
-    time0 + d / PI2 / gmstK;
+    time0 + d / Const.PI2 / gmstK;
   }
-
-  private val PI2 = Math.PI * 2.0;
 
   private val gmstK = 1.0027379094;
 

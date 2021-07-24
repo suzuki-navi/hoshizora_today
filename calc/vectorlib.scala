@@ -98,7 +98,7 @@ object VectorLib {
     val x = xyz(0);
     val y = xyz(1);
     val lng = Math.atan2(y, x);
-    if (lng < 0) lng + PI2 else lng;
+    if (lng < 0) lng + Const.PI2 else lng;
   }
 
   def xyzToLat(xyz: Array[Double]): Double = {
@@ -112,10 +112,8 @@ object VectorLib {
 
   def calcLngDiff(lng1: Double, lng2: Double): Double = {
     val d = lng1 - lng2;
-    if (d < 0) d + PI2 else d;
+    if (d < 0) d + Const.PI2 else d;
   }
-
-  private val PI2 = Math.PI * 2.0;
 
 }
 

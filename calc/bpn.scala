@@ -13,7 +13,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     (-0.00031238  +
     (-0.000002788 +
     ( 0.0000000260)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
+    * jc) * jc) * jc) * jc) * jc) * Const.PI_AS2R;
   }
 
   private def calcPhi(time: Double): Double = {
@@ -24,7 +24,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     (    0.00053289  +
     (   -0.000000440 +
     (   -0.0000000176)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
+    * jc) * jc) * jc) * jc) * jc) * Const.PI_AS2R;
   }
 
   private def calcPsi(time: Double): Double = {
@@ -35,7 +35,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     (  -0.00018522  +
     (  -0.000026452 +
     (  -0.0000000148)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
+    * jc) * jc) * jc) * jc) * jc) * Const.PI_AS2R;
   }
 
   private def calcEps(time: Double): Double = {
@@ -46,14 +46,14 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     (    0.00200340   +
     (   -5.76 * 10e-7 +
     (   -4.34 * 10e-8)
-    * jc) * jc) * jc) * jc) * jc) * PI_AS2R;
+    * jc) * jc) * jc) * jc) * jc) * Const.PI_AS2R;
   }
 
   val icrsToJ2000Matrix: Array[Double] = {
     var r: Array[Double] = VectorLib.unitMatrix;
-    r = VectorLib.rotateMatrixX(  5.1 / 1000 / 3600 / PI57, r);
-    r = VectorLib.rotateMatrixY( 17.3 / 1000 / 3600 / PI57, r);
-    r = VectorLib.rotateMatrixZ(-78.0 / 1000 / 3600 / PI57, r);
+    r = VectorLib.rotateMatrixX(  5.1 / 1000 / 3600 / Const.PI57, r);
+    r = VectorLib.rotateMatrixY( 17.3 / 1000 / 3600 / Const.PI57, r);
+    r = VectorLib.rotateMatrixZ(-78.0 / 1000 / 3600 / Const.PI57, r);
     r;
   }
 
@@ -129,35 +129,35 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
       (        31.8792    +
       (         0.051635  +
       (        -0.00024470)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
+      * jc) * jc) * jc) * jc) * Const.PI_AS2R % Const.PI2;
     val lp_mhb2000 =
       (  1287104.79305   +
       (129596581.0481    +
       (       -0.5532    +
       (        0.000136  +
       (       -0.00001149)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
+      * jc) * jc) * jc) * jc) * Const.PI_AS2R % Const.PI2;
     val f_iers2003 =
       (     335779.526232 +
       (1739527262.8478    +
       (       -12.7512    +
       (        -0.001037  +
       (         0.00000417)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
+      * jc) * jc) * jc) * jc) * Const.PI_AS2R % Const.PI2;
     val d_mhb2000 =
       (   1072260.70369   +
       (1602961601.2090    +
       (        -6.3706    +
       (         0.006593  +
       (        -0.00003169)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
+      * jc) * jc) * jc) * jc) * Const.PI_AS2R % Const.PI2;
     val om_iers2003 =
       (  450160.398036  +
       (-6962890.5431    +
       (       7.4722    +
       (       0.007702  +
       (      -0.00005939)
-      * jc) * jc) * jc) * jc) * PI_AS2R % PI2;
+      * jc) * jc) * jc) * jc) * Const.PI_AS2R % Const.PI2;
 
     var dpsi: Double = 0.0;
     var deps: Double = 0.0;
@@ -168,7 +168,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
                  d(1) * lp_mhb2000 +
                  d(2) * f_iers2003 +
                  d(3) * d_mhb2000 +
-                 d(4) * om_iers2003) % PI2;
+                 d(4) * om_iers2003) % Const.PI2;
       val sin = Math.sin(arg);
       val cos = Math.cos(arg);
       dpsi = dpsi + (d(5) + d(6) * jc) * sin + d(7) * cos;
@@ -183,55 +183,55 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     val l_mhb2000 =
       (   2.35555598  +
       (8328.6914269554)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val f_mhb2000 =
       (   1.627905234 +
       (8433.466158131)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val d_mhb2000_2 =
       (   5.198466741 +
       (7771.3771468121)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val om_mhb2000 =
       (  2.18243920 +
       (-33.757045)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val pa_iers2003 =
       (0.024381750 +
       (0.00000538691)
-      * jc) * jc % PI2;
+      * jc) * jc % Const.PI2;
     val lme_iers2003 =
       (   4.402608842 +
       (2608.7903141574)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lve_iers2003 =
       (   3.176146697 +
       (1021.3285546211)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lea_iers2003 =
       (  1.753470314 +
       (628.3075849991)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lma_iers2003 =
       (  6.203480913 +
       (334.0612426700)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lju_iers2003 =
       ( 0.599546497 +
       (52.9690962641)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lsa_iers2003 =
       ( 0.874016757 +
       (21.3299104960)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lur_iers2003 =
       (5.481293872 +
       (7.4781598567)
-      * jc) % PI2;
+      * jc) % Const.PI2;
     val lne_mhb2000 =
       (5.321159000 +
       (3.8127774000)
-      * jc) % PI2;
+      * jc) % Const.PI2;
 
 
     var dpsi: Double = 0.0;
@@ -251,7 +251,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
                  d(9) * lju_iers2003 +
                  d(10) * lsa_iers2003 +
                  d(11) * lur_iers2003 +
-                 d(12) * lne_mhb2000) % PI2;
+                 d(12) * lne_mhb2000) % Const.PI2;
       val sin = Math.sin(arg);
       val cos = Math.cos(arg);
       dpsi = dpsi + d(14) * sin + d(15) * cos;
@@ -278,7 +278,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
         if (j < 5) {
           data1(i * 11 + j).toDouble;
         } else {
-          data1(i * 11 + j).toDouble * 0.001 * PI_AS2R;
+          data1(i * 11 + j).toDouble * 0.001 * Const.PI_AS2R;
         }
       }
     }
@@ -302,7 +302,7 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
         if (j < 14) {
           data1(i * 18 + j).toDouble;
         } else {
-          data1(i * 18 + j).toDouble * 0.001 * PI_AS2R;
+          data1(i * 18 + j).toDouble * 0.001 * Const.PI_AS2R;
         }
       }
     }
