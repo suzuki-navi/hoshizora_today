@@ -59,15 +59,13 @@ object JplData {
   object Jupiter extends TargetPlanet;
   object Saturn  extends TargetPlanet;
 
-}
+  private[this] val jplData: IndexedSeq[IndexedSeq[Double]] = loadJplData();
 
-class JplData(dataPath: String) {
-
-  private[this] val jplData: IndexedSeq[IndexedSeq[Double]] = loadJplData(dataPath);
-
-  private[this] def loadJplData(dataPath: String): IndexedSeq[IndexedSeq[Double]] = {
+  private[this] def loadJplData(): IndexedSeq[IndexedSeq[Double]] = {
+    val dataPath: String = "ascp1950.430";
     val data1 = {
-      val sc = new java.util.Scanner(new java.io.BufferedInputStream(new java.io.FileInputStream(dataPath)));
+      val sc = new java.util.Scanner(new java.io.BufferedInputStream(
+        getClass.getClassLoader.getResourceAsStream(dataPath)));
       val data1 = scala.collection.mutable.ArrayBuffer[String]();
       while (sc.hasNext) {
         data1 += sc.next();

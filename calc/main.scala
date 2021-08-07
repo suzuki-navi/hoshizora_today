@@ -10,7 +10,6 @@ val endTime = TimeLib.stringToModifiedJulianDay   ("2022-07-11T00:00:00+09:00");
 val period = (endTime - startTime).toInt;
 
 
-val jplDataPath = "../var/ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.430";
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
 val diffDataPath = "diff.txt";
@@ -26,7 +25,6 @@ val tokyoLat = 35.7 / Const.PI57;
 
 System.err.println("Started calculating...");
 
-val jplData = new JplData(jplDataPath);
 val hcs = new Hcs(tokyoLng, tokyoLat);
 val constellationData = Constellations;
 val words = new Words();
@@ -41,7 +39,7 @@ val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, td
   (0 until period).map { d =>
     val time = Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val tdb = TimeLib.mjdutcToTdb(time);
-      val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
+      val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
       val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(sun2, time);
@@ -57,7 +55,7 @@ def sunsetTimes(day: Int): Double = sunsetTimesData(day)._1;
 
 def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Double, Double) = { // azi, alt
   val (time, tdb, bpnMatrix) = sunsetTimesData(day);
-  val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+  val xyz = JplData.calcPlanetFromEarth(tdb, targetPlanet);
   val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
   hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
 }
@@ -66,7 +64,7 @@ def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Arra
   val tdb = TimeLib.mjdutcToTdb(time);
   val ut1 = time; // 近似的
   val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-  val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+  val xyz = JplData.calcPlanetFromEarth(tdb, targetPlanet);
   val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
   val azialt = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
   (xyz, azialt._1, azialt._2);
@@ -234,8 +232,8 @@ def moonPhaseNaturalString(moonPhase: Double): String = {
 def calcMoonLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val moon = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
+  val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
+  val moon = JplData.calcPlanetFromEarth(tdb, JplData.Moon);
   val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
@@ -368,7 +366,7 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
   val utc = time;
   val ut1 = time; // 近似的
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun_xyz = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
+  val sun_xyz = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val sun_distance = VectorLib.angularDistance(sun_xyz, xyz);
   if (sun_distance < sun_distanceThres) {
     None;
@@ -478,7 +476,7 @@ def removeTweet(time: Double, message: String): Unit = {
 def calcSunLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
+  val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
@@ -487,7 +485,7 @@ def calcSunLng(time: Double): Double = {
 def calcSunLng2(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
+  val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
@@ -620,7 +618,7 @@ def calcSunLng2(time: Double): Double = {
   def calcMoonConstellation(time: Double): Option[(String, List[String])] = {
     if (isNightTime2(time)) {
       val tdb = TimeLib.mjdutcToTdb(time);
-      val xyz = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
+      val xyz = JplData.calcPlanetFromEarth(tdb, JplData.Moon);
       val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -640,7 +638,7 @@ def calcSunLng2(time: Double): Double = {
     val fullMoonsDistanceMaxMinUpDownFlags = MathLib.getMaxMinUpDownFlagListDiscrete(0, fullMoons.size, 2) { idx =>
       val utc = fullMoons(idx);
       val tdb = TimeLib.mjdutcToTdb(utc);
-      val moon = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
+      val moon = JplData.calcPlanetFromEarth(tdb, JplData.Moon);
       VectorLib.distance(moon);
     }
     fullMoonsDistanceMaxMinUpDownFlags.zipWithIndex.map { case (flag, idx) =>
@@ -683,7 +681,7 @@ def calcSunLng2(time: Double): Double = {
 MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
+  val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
   VectorLib.distance(sun);
 }.foreach { case (time, flag) =>
   val s = if (flag < 0) "近日点" else "遠日点";
@@ -703,8 +701,8 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
   def calcInnerPlanetLngEc(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-    val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+    val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
+    val planet = JplData.calcPlanetFromEarth(tdb, targetPlanet);
     val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
     val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
@@ -761,8 +759,8 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
   def calcOuterPlanetLngEq(time: Double, targetPlanet: JplData.TargetPlanet): Double = {
     val utc = time;
     val tdb = TimeLib.mjdutcToTdb(utc);
-    val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-    val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+    val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
+    val planet = JplData.calcPlanetFromEarth(tdb, targetPlanet);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
     val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
@@ -779,7 +777,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     }.map { case (time, term) =>
       val utc = time;
       val tdb = TimeLib.mjdutcToTdb(utc);
-      val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
+      val xyz = JplData.calcPlanetFromEarth(tdb, targetPlanet);
       if (term == 0) {
         (time, planetName, "合(赤経基準)", false, None, pi);
       } else if (term == 1) {
@@ -1258,7 +1256,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           star0._2;
         },
         { tdb: Double =>
-          jplData.calcPlanetFromEarth(tdb, star2._2);
+          JplData.calcPlanetFromEarth(tdb, star2._2);
         });
     }
   }
@@ -1266,10 +1264,10 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
     stars1.foreach { star1 =>
       calcClosestMoon(star1._1, star2._1, List(star1._1),
         { tdb: Double =>
-          jplData.calcPlanetFromEarth(tdb, star1._2);
+          JplData.calcPlanetFromEarth(tdb, star1._2);
         },
         { tdb: Double =>
-          jplData.calcPlanetFromEarth(tdb, star2._2);
+          JplData.calcPlanetFromEarth(tdb, star2._2);
         });
     }
   }
@@ -1280,7 +1278,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           star0._2;
         },
         { tdb: Double =>
-          jplData.calcPlanetFromEarth(tdb, star1._2);
+          JplData.calcPlanetFromEarth(tdb, star1._2);
         });
     }
   }
@@ -1290,10 +1288,10 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       val star0 = stars1(j);
       calcClosest2(star0._1, star1._1, List(star1._1, star0._1),
         { tdb: Double =>
-          jplData.calcPlanetFromEarth(tdb, star0._2);
+          JplData.calcPlanetFromEarth(tdb, star0._2);
         },
         { tdb: Double =>
-          jplData.calcPlanetFromEarth(tdb, star1._2);
+          JplData.calcPlanetFromEarth(tdb, star1._2);
         });
     }
   }
