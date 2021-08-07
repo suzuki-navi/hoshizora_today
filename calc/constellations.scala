@@ -222,7 +222,7 @@ class Words() {
   private var history: Map[String, (List[Int], Int)] = Map.empty;
   private var contents: Map[String, IndexedSeq[Words.LunchTimeContent]] = Map.empty;
 
-  val periodStart: Int = 168; // PERIOD 2021/07/18
+  val periodStart: Int = 109; // PERIOD 2021/07/18
 
   def loadHistory(path: String): Unit = {
     history = Map.empty;

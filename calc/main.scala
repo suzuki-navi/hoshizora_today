@@ -1608,7 +1608,7 @@ tweetMoonRiseSet();
     val altHor = -0.90 / Const.PI57;
     var index: Int = -1;
     val culminationContents = Constellations.culminationContents;
-    (87 until Period.period).foreach { day => // PERIOD
+    (28 until Period.period).foreach { day => // PERIOD
       if (index < 0) {
         val time = Period.startTime + day + 20.9 / 24.0; // PERIOD
         val sid = hcs.siderealTimeFromUtc(time);
@@ -1653,7 +1653,7 @@ tweetMoonRiseSet();
   // 星座の解説など
   def putTweetLunchTimeContents(): Unit = {
     val lunchTimeContents = Constellations.lunchTimeContents;
-    var day1: Int = 62; // PERIOD 2021/04/03
+    var day1: Int = 3; // PERIOD 2021/04/03
     var day2: Int = day1;
     var index: Int = {
       val time = Period.startTime + day1 + 21.0 / 24.0;
@@ -1667,7 +1667,7 @@ tweetMoonRiseSet();
     }
     while (day1 < Period.period) {
       val sid = hcs.siderealTimeFromUtc(Period.startTime + day1 + 21.0 / 24);
-      if (MathLib.circleAdd(sid, -lunchTimeContents(index)._1) >= 0) {
+      if (MathLib.circleDiff1(sid, lunchTimeContents(index)._1) >= 0) {
         val msg = lunchTimeContents(index)._2;
         {
           val p = (day1 until (day2 + 14)).indexWhere { d =>
@@ -1693,7 +1693,7 @@ tweetMoonRiseSet();
 
   {
     var kind: Int = 0;
-    (90 until Period.period).foreach { day => // PERIOD
+    (31 until Period.period).foreach { day => // PERIOD
       val wday = TimeLib.wday(Period.startTime + day);
       if (wday == 1) { // 月曜
         if ((Period.startTime + day).toInt % 2 == 0) {
@@ -1722,7 +1722,7 @@ tweetMoonRiseSet();
       }
     }
   }
-  (99 until Period.period).foreach { day => // PERIOD
+  (40 until Period.period).foreach { day => // PERIOD
     val wday = TimeLib.wday(Period.startTime + day);
     if (wday == 1) {
       if ((Period.startTime + day).toInt % 2 == 0) {
