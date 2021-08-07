@@ -170,7 +170,7 @@ object Words {
     ra: Double, dec: Double, xyz: Array[Double]) extends LunchTimeContent {
     def content(day: Int, hcs: Hcs): String = {
       val altHor = -0.90 / PI57;
-      val time = Main.startTime + day + 21.0 / 24;
+      val time = Period.startTime + day + 21.0 / 24;
       val tdb = TimeLib.mjdutcToTdb(time);
       val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
@@ -253,7 +253,7 @@ class Words() {
           writer.println(line);
         }
         days.reverse.foreach { day =>
-          val line = "%s:%s".format(word, TimeLib.timeToDateString(Main.startTime + day));
+          val line = "%s:%s".format(word, TimeLib.timeToDateString(Period.startTime + day));
           writer.println(line);
         }
       }
@@ -284,8 +284,8 @@ class Words() {
   }
 
   private def findRecentWord(day: Int, hcs: Hcs, tweets: Tweets): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
-    val time = Main.startTime + day + 12.0 / 24;
-    val lastTweets = (-13 to 0).flatMap(i => tweets.getTweets(Main.startTime + day + i).tweets);
+    val time = Period.startTime + day + 12.0 / 24;
+    val lastTweets = (-13 to 0).flatMap(i => tweets.getTweets(Period.startTime + day + i).tweets);
     val lst = lastTweets.flatMap(_.starNames);
     if (lst.nonEmpty) {
       import Ordering.Double.IeeeOrdering;
@@ -310,7 +310,7 @@ class Words() {
     findRecentWord(day, hcs, tweets) match {
       case None => ;
       case Some((word, contents)) =>
-        val time1 = Main.startTime + day + (12.0 + 50.0 / 60) / 24;
+        val time1 = Period.startTime + day + (12.0 + 50.0 / 60) / 24;
         var inc: Int = 0;
         contents.foreach { content =>
           val c = content.content(day + inc / 4, hcs);

@@ -14,7 +14,7 @@ object TimeLib {
   }
 
   def dateStringToDay(str: String): Int = {
-    (stringToModifiedJulianDay(str + "T00:00:00Z") - Main.startTime).toInt;
+    (stringToModifiedJulianDay(str + "T00:00:00Z") - Period.startTime).toInt;
   }
 
   // 2021-04-01
@@ -90,8 +90,8 @@ object TimeLib {
       (year.toInt, month.toInt);
     }
     val (y0, m0) = sub(time0);
-    val (y1, m1) = sub(Main.startTime + day1);
-    val (y2, m2) = sub(Main.startTime + day2);
+    val (y1, m1) = sub(Period.startTime + day1);
+    val (y2, m2) = sub(Period.startTime + day2);
     val s1 = if (y0 == y1 && m0 == m1) {
       "今月";
     } else if (y0 == y1 && m0 + 1 == m1 || y0 + 1 == y1 && m0 - 11 == m1) {

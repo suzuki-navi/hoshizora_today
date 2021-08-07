@@ -81,17 +81,17 @@ object DateTweets {
   def apply(): DateTweets = DateTweets(Nil, Nil);
 
   def isDayTime(time: Double): Boolean = {
-    val day = (time - Main.startTime).toInt;
+    val day = (time - Period.startTime).toInt;
     val s = Main.sunsetTimes(day);
     time - time.toInt >= 0.0 / 24 && time < s; // 9時～日没
   }
 
 }
 
-class Tweets(startTime: Double, period: Int) {
+class Tweets() {
 
-  var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
-    val date = TimeLib.timeToDateString(startTime + day);
+  var _tweets: Map[String, DateTweets] = (0 until Period.period).map { day =>
+    val date = TimeLib.timeToDateString(Period.startTime + day);
     (date, DateTweets());
   }.toMap;
 

@@ -1,14 +1,6 @@
 
 object Main {
 
-// PERIOD
-val startTime = TimeLib.stringToModifiedJulianDay ("2021-01-31T00:00:00+09:00");
-val startTime1 = TimeLib.stringToModifiedJulianDay("2021-07-18T00:00:00+09:00");
-val endTime1 = TimeLib.stringToModifiedJulianDay  ("2022-07-18T00:00:00+09:00");
-val endTime = TimeLib.stringToModifiedJulianDay   ("2022-07-18T00:00:00+09:00");
-
-val period = (endTime - startTime).toInt;
-
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
 val diffDataPath = "diff.txt";
@@ -33,8 +25,8 @@ words.loadHistory(wordHistoryPath);
 
 val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, tdb, bpnMatrix
   val altHor = -0.90 / Const.PI57;
-  (0 until period).map { d =>
-    val time = Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
+  (0 until Period.period).map { d =>
+    val time = Lib2.findCrossingBoundaryTime(altHor, true, false, Period.startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val tdb = TimeLib.mjdutcToTdb(time);
       val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
       val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
@@ -69,7 +61,7 @@ def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Arra
 
 def calcRiseSetCulmination(targetPlanet: JplData.TargetPlanet, altHor: Double):
   IndexedSeq[(Double, Double, Double, Double)] = { // 出, 南中, 没, 南中高度
-  val riseSet = MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 0.25, 24 * 6) { time =>
+  val riseSet = MathLib.findMaxMinCrossingListContinuous(Period.startTime, Period.endTime, 0.25, 24 * 6) { time =>
     calcPlanetXyzAziAlt(time, targetPlanet)._3 - altHor;
   }.filter(_._2 % 2 == 0);
   var result: List[(Double, Double, Double, Double)] = Nil;
@@ -298,7 +290,7 @@ def calcMoonPhaseString(time: Double): String = {
   "月相%.1f/28、輝面比%.1f%%、%s%s".format(moonPhase, moonPhaseRatio, moonDayCountStr, phaseStr);
 }
 val moonPhaseTerms: IndexedSeq[(Double, Int)] = { // time, term
-  MathLib.findCyclicPhaseListContinuous(8, startTime, endTime, 3.0, 24)(calcMoonLng);
+  MathLib.findCyclicPhaseListContinuous(8, Period.startTime, Period.endTime, 3.0, 24)(calcMoonLng);
 }
 
 val innerPlanets = IndexedSeq(
@@ -306,7 +298,7 @@ val innerPlanets = IndexedSeq(
   ("水星", JplData.Mercury, 3)
 );
 val innerPlanetsSunsetAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = innerPlanets.map { planet =>
-  (0 until period).map { day =>
+  (0 until Period.period).map { day =>
     calcPlanetOnSunsetTime(day, planet._2);
   }
 }
@@ -318,12 +310,12 @@ val outerPlanets = IndexedSeq(
 );
 val outerPlanetsNightAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = outerPlanets.map { planet =>
   val period2 = if (planet._1 == "火星") {
-    period + 700;
+    Period.period + 700;
   } else {
-    period + 300;
+    Period.period + 300;
   }
   (0 until period2).map { day =>
-    val time = startTime + day + 21.0 / 24.0;
+    val time = Period.startTime + day + 21.0 / 24.0;
     val t = calcPlanetXyzAziAlt(time, planet._2);
     (t._2, t._3);
   }
@@ -332,27 +324,27 @@ val outerPlanetsNightAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = oute
 //==============================================================================
 
 def isLunchTime(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
+  val day = (time - Period.startTime).toInt;
   val s = sunsetTimes(day);
   //time - time.toInt >= 3.0 / 24 && time - time.toInt < 4.0 / 24; // 12時～13時
   time - time.toInt >= 1.0 / 24 && time - time.toInt < 7.0 / 24; // 10時～16時
 }
 
 def isNightTime0(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
+  val day = (time - Period.startTime).toInt;
   val s = sunsetTimes(day);
   //time - time.toInt >= 5.0 / 24 && time - time.toInt < 15.0 / 24;
   time > s && time - time.toInt < 14.0 / 24;
 }
 
 def isNightTime2(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
+  val day = (time - Period.startTime).toInt;
   val s = sunsetTimes(day);
   time >= s && time - time.toInt < 16.0 / 24;
 }
 
 def isNightTime3(time: Double): Boolean = {
-  val day = (time - startTime).toInt;
+  val day = (time - Period.startTime).toInt;
   val s = sunsetTimes(day);
   time - time.toInt >= 11.0 / 24 && time - time.toInt < 14.1 / 24;
 }
@@ -382,7 +374,7 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
         // 23時に見える
         Some(time21 + 2.0 / 24);
       } else {
-        val day = (time - startTime).toInt;
+        val day = (time - Period.startTime).toInt;
         val sunsetTime = sunsetTimes(day);
         val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, sunsetTime);
         if (alt >= altThres0) {
@@ -400,15 +392,15 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
 // ツイート管理
 //==============================================================================
 
-val tweetsManager = new Tweets(startTime, period);
+val tweetsManager = new Tweets();
 
 //==============================================================================
 // 祝日・記念日
 //==============================================================================
 
 {
-  val yearStart = TimeLib.timeToDateTimeString(startTime).substring(0, 4).toInt;
-  val yearEnd = TimeLib.timeToDateTimeString(endTime).substring(0, 4).toInt;
+  val yearStart = TimeLib.timeToDateTimeString(Period.startTime).substring(0, 4).toInt;
+  val yearEnd = TimeLib.timeToDateTimeString(Period.endTime).substring(0, 4).toInt;
   val source = scala.io.Source.fromFile(holidayDataPath);
   source.getLines.foreach { line =>
     if (line != "" && !line.startsWith("#")) {
@@ -458,7 +450,7 @@ def calcSunLng2(time: Double): Double = {
 //--------------------------------------
 
 {
-  val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, startTime, endTime, 3.0, 24) { time =>
+  val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, Period.startTime, Period.endTime, 3.0, 24) { time =>
     calcSunLng(time);
   }
   val termStrs = IndexedSeq(
@@ -498,7 +490,7 @@ def calcSunLng2(time: Double): Double = {
 
   var day: Int = 0;
   var index: Int = {
-    val time = startTime + day + 0.5;
+    val time = Period.startTime + day + 0.5;
     val lng = calcSunLng2(time);
     val index = meteorShowerData._1.indexWhere(_._1 > lng);
     if (index < 0) {
@@ -507,8 +499,8 @@ def calcSunLng2(time: Double): Double = {
       index;
     }
   }
-  while (day < period) {
-    val time = startTime + day + 0.5;
+  while (day < Period.period) {
+    val time = Period.startTime + day + 0.5;
     val lng = calcSunLng2(time);
     val d = MathLib.circleAdd(lng, -meteorShowerData._1(index)._1);
     if (d >= 0) {
@@ -639,7 +631,7 @@ def calcSunLng2(time: Double): Double = {
 // 近日点・遠日点
 //--------------------------------------
 
-MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
+MathLib.findMaxMinListContinuous(Period.startTime, Period.endTime, 30, 24) { time =>
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
@@ -675,7 +667,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
 
   {
     val (planetName, targetPlanet) = ("水星", JplData.Mercury);
-    MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
+    MathLib.findMaxMinCrossingListContinuous(Period.startTime, Period.endTime, 10.0, 24) { time =>
       calcInnerPlanetLngEc(time, targetPlanet);
     }.map { case (time, term) =>
       if (term == 0) {
@@ -696,7 +688,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
 
   {
     val (planetName, targetPlanet) = ("金星", JplData.Venus);
-    MathLib.findMaxMinCrossingListContinuous(startTime, endTime, 10.0, 24) { time =>
+    MathLib.findMaxMinCrossingListContinuous(Period.startTime, Period.endTime, 10.0, 24) { time =>
       calcInnerPlanetLngEc(time, targetPlanet);
     }.map { case (time, term) =>
       if (term == 0) {
@@ -733,7 +725,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
 
   val planetPhases1: List[(Double, String, String, Boolean, Option[Array[Double]], Int)] = outerPlanets.zipWithIndex.toList.
   flatMap { case ((planetName, targetPlanet, _), pi) =>
-    MathLib.findCyclicPhaseListContinuous(4, startTime, endTime, 30, 24) { time =>
+    MathLib.findCyclicPhaseListContinuous(4, Period.startTime, Period.endTime, 30, 24) { time =>
       Const.PI2 - calcOuterPlanetLngEq(time, targetPlanet);
     }.map { case (time, term) =>
       val utc = time;
@@ -760,7 +752,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
       TimeLib.floor(time, 24) + 1.0 / (24 * 4);
     }
     val nextSeasonMsg = {
-      val day = (time - startTime).toInt;
+      val day = (time - Period.startTime).toInt;
       val (azi, alt) = outerPlanetsNightAziAltList(pi)(day);
       if (alt < altThres) {
         val (p1, p2) = calcNextSeason(outerPlanetsNightAziAltList(pi), day);
@@ -945,7 +937,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
 {
   val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
   planets.foreach { p =>
-    MathLib.findMaxMinListDiscrete(0, period, 15) { day =>
+    MathLib.findMaxMinListDiscrete(0, Period.period, 15) { day =>
       val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
       alt;
     }.foreach { case (day, flag) =>
@@ -965,12 +957,12 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
 
   (0 until moonPhaseTerms.size).foreach { i =>
     val (moonPhaseTime, term) = moonPhaseTerms(i);
-    if (term == 0 && moonPhaseTime + 4 < endTime) {
+    if (term == 0 && moonPhaseTime + 4 < Period.endTime) {
       (0 until 4).foreach { d =>
-        val day = (moonPhaseTime + d - startTime).toInt;
+        val day = (moonPhaseTime + d - Period.startTime).toInt;
         val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
         if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-          val day = (moonPhaseTime + d - startTime).toInt;
+          val day = (moonPhaseTime + d - Period.startTime).toInt;
           val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
           tweetsManager.putTweet(SunsetMoonTweetContent(day, azi, alt));
         }
@@ -988,9 +980,9 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
 
   val planets = IndexedSeq(("金星", JplData.Venus, 5), ("水星", JplData.Mercury, 3));
   innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
-    (1 until period).foreach { day =>
-      val wday = TimeLib.wday(startTime + day);
-      val sunsetTweets = tweetsManager.getTweets(startTime + day).sunsetTweets;
+    (1 until Period.period).foreach { day =>
+      val wday = TimeLib.wday(Period.startTime + day);
+      val sunsetTweets = tweetsManager.getTweets(Period.startTime + day).sunsetTweets;
       if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
         val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
         if (alt >= altThres0) {
@@ -1013,8 +1005,8 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
 
   val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
   val planets2 = IndexedSeq(("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn));
-  (1 until period).foreach { day =>
-    val sunsetTweets = tweetsManager.getTweets(startTime + day).sunsetTweets;
+  (1 until Period.period).foreach { day =>
+    val sunsetTweets = tweetsManager.getTweets(Period.startTime + day).sunsetTweets;
     if (sunsetTweets.nonEmpty) {
       planets.foreach { p =>
         if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
@@ -1066,14 +1058,14 @@ def calcNextSeason(aziAltList: IndexedSeq[(Double, Double)], day: Int): (Int, In
   val altThres = 15 / Const.PI57;
 
   innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
-    (1 until period).foreach { day =>
-      if ((startTime + day).toInt % 2 == 0) {
-        val wday = TimeLib.wday(startTime + day);
-        val sunsetTweets = tweetsManager.getTweets(startTime + day).sunsetTweets;
+    (1 until Period.period).foreach { day =>
+      if ((Period.startTime + day).toInt % 2 == 0) {
+        val wday = TimeLib.wday(Period.startTime + day);
+        val sunsetTweets = tweetsManager.getTweets(Period.startTime + day).sunsetTweets;
         if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
           val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
           if (alt < altThres) {
-            val time = startTime + day + 12.5 / 24;
+            val time = Period.startTime + day + 12.5 / 24;
             val (p1, p2) = calcNextSeason(innerPlanetsSunsetAziAltList(pi), day);
             tweetsManager.putTweet(SunsetNextPlanetTweetContent(time, planet._1, p1, p2));
           }
@@ -1085,10 +1077,10 @@ def calcNextSeason(aziAltList: IndexedSeq[(Double, Double)], day: Int): (Int, In
 
 // 日没時間
 {
-  MathLib.getMaxMinUpDownFlagListDiscrete(0, period, 90) { day =>
-    sunsetTimes(day) - startTime - day;
+  MathLib.getMaxMinUpDownFlagListDiscrete(0, Period.period, 90) { day =>
+    sunsetTimes(day) - Period.startTime - day;
   }.zipWithIndex.foreach { case (flag, day) =>
-    val wday = TimeLib.wday(startTime + day);
+    val wday = TimeLib.wday(Period.startTime + day);
     if (flag == 1 || flag == 3 || wday == 0) {
       tweetsManager.putTweet(SunsetTweetContent(day, flag));
     }
@@ -1133,7 +1125,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   def calcClosestMoon(slowStarName: String, fastStarName: String, hashtags: List[String],
     slowStarXyzFunc: Double => Array[Double],
     fastStarXyzFunc: Double => Array[Double]): Unit = {
-    MathLib.findMaxMinListContinuous(startTime, endTime, 10.0, 24 * 6) { time =>
+    MathLib.findMaxMinListContinuous(Period.startTime, Period.endTime, 10.0, 24 * 6) { time =>
       val utc = time;
       val tdb = TimeLib.mjdutcToTdb(utc);
       val xyz_s = slowStarXyzFunc(tdb);
@@ -1159,7 +1151,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   def calcClosest2(slowStarName: String, fastStarName: String, hashtags: List[String],
     slowStarXyzFunc: Double => Array[Double],
     fastStarXyzFunc: Double => Array[Double]): Unit = {
-    MathLib.findMaxMinListContinuous(startTime, endTime, 10.0, 24) { time =>
+    MathLib.findMaxMinListContinuous(Period.startTime, Period.endTime, 10.0, 24) { time =>
       val utc = time;
       val tdb = TimeLib.mjdutcToTdb(utc);
       val xyz_s = slowStarXyzFunc(tdb);
@@ -1264,15 +1256,15 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 
 {
   val altThres = 10 / Const.PI57;
-  (0 until period).foreach { d =>
-    val time = startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
+  (0 until Period.period).foreach { d =>
+    val time = Period.startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
     if (!tweetsManager.getTweets(time).tweets.filter(tc => isNightTime0(tc.time)).flatMap(_.starNames).contains("月")) {
       {
         val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
         if (alt >= altThres) {
           Some((time, xyz, azi, alt));
         } else {
-          val time = startTime + d + 23.0 / 24.0;
+          val time = Period.startTime + d + 23.0 / 24.0;
           val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
           if (alt >= altThres) {
             Some((time, xyz, azi, alt));
@@ -1303,8 +1295,8 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 
 {
   val altThres = 15 / Const.PI57;
-  (0 until period).foreach { d =>
-    val time = startTime + d + 21.0 / 24.0;
+  (0 until Period.period).foreach { d =>
+    val time = Period.startTime + d + 21.0 / 24.0;
     val wday = TimeLib.wday(time);
     val (planetName, targetPlanet) = if (wday == 2) {
       ("火星", Some(JplData.Mars));
@@ -1323,7 +1315,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           if (alt >= altThres) {
             Some((time, xyz, azi, alt));
           } else {
-            val time = startTime + d + 23.0 / 24.0;
+            val time = Period.startTime + d + 23.0 / 24.0;
             val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
             if (alt >= altThres) {
               Some((time, xyz, azi, alt));
@@ -1348,20 +1340,20 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   val altThres = 15 / Const.PI57;
 
   outerPlanets.zipWithIndex.foreach { case (planet, pi) =>
-    (0 until period).foreach { day =>
-      if ((startTime + day).toInt % 2 == 0) {
-        val wday = TimeLib.wday(startTime + day);
-        val tweets = tweetsManager.getTweets(startTime + day).tweets;
+    (0 until Period.period).foreach { day =>
+      if ((Period.startTime + day).toInt % 2 == 0) {
+        val wday = TimeLib.wday(Period.startTime + day);
+        val tweets = tweetsManager.getTweets(Period.startTime + day).tweets;
         if (wday == planet._3 && !tweets.exists(_.starNames.contains(planet._1))) {
           if (!(-6 to +6).exists { i =>
-            tweetsManager.getTweets(startTime + day + i).tweets.exists {
+            tweetsManager.getTweets(Period.startTime + day + i).tweets.exists {
               case PlanetAstronomyTweetContent(_, _, planetName) if (planetName == planet._1) => true;
               case _ => false;
             }
           }) {
             val (azi, alt) = outerPlanetsNightAziAltList(pi)(day);
             if (alt < altThres) {
-              val time = startTime + day + 12.5 / 24;
+              val time = Period.startTime + day + 12.5 / 24;
               val (p1, p2) = calcNextSeason(outerPlanetsNightAziAltList(pi), day);
               tweetsManager.putTweet(NightNextPlanetTweetContent(time, planet._1, p1, p2));
             }
@@ -1425,7 +1417,7 @@ tweetMoonRiseSet();
   // この時期21時ごろ見えやすい星座
   def putTweetConstellations21(day: Int): Unit = {
     val altThres = 30.0 / Const.PI57;
-    val time = startTime + day + 21.0 / 24;
+    val time = Period.startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = Constellations.constellationData.flatMap { constellation =>
@@ -1440,13 +1432,13 @@ tweetMoonRiseSet();
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
     val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見えやすい星座は、%sです #星空 #星座".format(constellationsStr);
-    tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+    tweetsManager.putTweet(Period.startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
   // この時期21時ごろ見える南の空低い星座
   def putTweetConstellationsSouth(day: Int): Boolean = {
     val decThres = - Const.PI5 + tokyoLat + 30.0 / Const.PI57;
-    val time = startTime + day + 21.0 / 24;
+    val time = Period.startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = Constellations.constellationData.flatMap { constellation =>
@@ -1466,7 +1458,7 @@ tweetMoonRiseSet();
       val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
       val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ南の低い空に見える星座は、%sです #星空 #星座".format(constellationsStr);
-      tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      tweetsManager.putTweet(Period.startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
       true;
     } else {
       false;
@@ -1477,7 +1469,7 @@ tweetMoonRiseSet();
   def putTweetBrightStars21(day: Int): Unit = {
     val altThres = 10.0 / Const.PI57;
     //val altThres = 0.0;
-    val time = startTime + day + 21.0 / 24;
+    val time = Period.startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = (Constellations.starData.flatMap { case (ra, xyz, name, hashtags) =>
@@ -1501,7 +1493,7 @@ tweetMoonRiseSet();
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
     val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見える明るい星は、%sです #星空".format(constellationsStr);
-    tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+    tweetsManager.putTweet(Period.startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
   // この時期日没時の一番星となりうる明るい星
@@ -1556,7 +1548,7 @@ tweetMoonRiseSet();
   // この時期21時ごろ見えやすい黄道十二星座
   def putTweetConstellationsEcliptical(day: Int): Boolean = {
     val altThres = 30.0 / Const.PI57;
-    val time = startTime + day + 21.0 / 24;
+    val time = Period.startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = Constellations.constellationData.filter(_.eclipticalFlag).flatMap { constellation =>
@@ -1575,7 +1567,7 @@ tweetMoonRiseSet();
       }.mkString("、");
       val starNames = constellations.sortBy(-_._2).map(_._3).toList;
       val msg = "この時期21時ごろ見えやすい黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
-      tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      tweetsManager.putTweet(Period.startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
       true;
     } else {
       false;
@@ -1585,7 +1577,7 @@ tweetMoonRiseSet();
   // この時期21時ごろ見える天の川
   def putTweetConstellationsGalaxy(day: Int): Boolean = {
     val altThres = 30.0 / Const.PI57;
-    val time = startTime + day + 21.0 / 24;
+    val time = Period.startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = Constellations.constellationData.filter(_.galaxyFlag).flatMap { constellation =>
@@ -1604,7 +1596,7 @@ tweetMoonRiseSet();
       val constellationsStr = constellations.sortBy(_._1).map(_._2).mkString("、");
       val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
-      tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      tweetsManager.putTweet(Period.startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
       true;
     } else {
       false;
@@ -1616,17 +1608,17 @@ tweetMoonRiseSet();
     val altHor = -0.90 / Const.PI57;
     var index: Int = -1;
     val culminationContents = Constellations.culminationContents;
-    (87 until period).foreach { day => // PERIOD
+    (87 until Period.period).foreach { day => // PERIOD
       if (index < 0) {
-        val time = startTime + day + 20.9 / 24.0; // PERIOD
+        val time = Period.startTime + day + 20.9 / 24.0; // PERIOD
         val sid = hcs.siderealTimeFromUtc(time);
         index = culminationContents.indexWhere(_._1 > sid);
         if (index < 0) {
           index = 0;
         }
       } else {
-        val timeS = startTime + day + 21.0 / 24.0;
-        val timeE = startTime + day + 23.0 / 24.0;
+        val timeS = Period.startTime + day + 21.0 / 24.0;
+        val timeE = Period.startTime + day + 23.0 / 24.0;
         val time1 = hcs.siderealTimeToUtc(culminationContents(index)._1, timeS);
         val time0 = if (time1 < timeS) {
           time1;
@@ -1664,7 +1656,7 @@ tweetMoonRiseSet();
     var day1: Int = 62; // PERIOD 2021/04/03
     var day2: Int = day1;
     var index: Int = {
-      val time = startTime + day1 + 21.0 / 24.0;
+      val time = Period.startTime + day1 + 21.0 / 24.0;
       val sid = hcs.siderealTimeFromUtc(time);
       val index = lunchTimeContents.indexWhere(_._1 > sid);
       if (index < 0) {
@@ -1673,20 +1665,20 @@ tweetMoonRiseSet();
         index;
       }
     }
-    while (day1 < period) {
-      val sid = hcs.siderealTimeFromUtc(startTime + day1 + 21.0 / 24);
+    while (day1 < Period.period) {
+      val sid = hcs.siderealTimeFromUtc(Period.startTime + day1 + 21.0 / 24);
       if (MathLib.circleAdd(sid, -lunchTimeContents(index)._1) >= 0) {
         val msg = lunchTimeContents(index)._2;
         {
           val p = (day1 until (day2 + 14)).indexWhere { d =>
-            !tweetsManager.getTweets(startTime + d).tweets.exists(tc => DateTweets.isDayTime(tc.time));
+            !tweetsManager.getTweets(Period.startTime + d).tweets.exists(tc => DateTweets.isDayTime(tc.time));
           }
           day1 = if (p < 0) day1 else day1 + p;
         }
         val urlOpt = lunchTimeContents(index)._3;
         val hashtags = lunchTimeContents(index)._4;
         val starNames = Nil;
-        tweetsManager.putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
+        tweetsManager.putTweet(StarTweetContent(Period.startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
         index += 1;
         if (index == lunchTimeContents.size) {
           index = 0;
@@ -1701,10 +1693,10 @@ tweetMoonRiseSet();
 
   {
     var kind: Int = 0;
-    (90 until period).foreach { day => // PERIOD
-      val wday = TimeLib.wday(startTime + day);
+    (90 until Period.period).foreach { day => // PERIOD
+      val wday = TimeLib.wday(Period.startTime + day);
       if (wday == 1) { // 月曜
-        if ((startTime + day).toInt % 2 == 0) {
+        if ((Period.startTime + day).toInt % 2 == 0) {
           putTweetConstellations21(day);
         } else {
           var i: Int = 0;
@@ -1724,17 +1716,17 @@ tweetMoonRiseSet();
           }
         }
       } else if (wday == 3) { // 水曜
-        if ((startTime + day).toInt % 2 == 1) {
+        if ((Period.startTime + day).toInt % 2 == 1) {
           putTweetBrightStars21(day);
         }
       }
     }
   }
-  (99 until period).foreach { day => // PERIOD
-    val wday = TimeLib.wday(startTime + day);
+  (99 until Period.period).foreach { day => // PERIOD
+    val wday = TimeLib.wday(Period.startTime + day);
     if (wday == 1) {
-      if ((startTime + day).toInt % 2 == 0) {
-        if (tweetsManager.getTweets(startTime + day).sunsetTweets.isEmpty) {
+      if ((Period.startTime + day).toInt % 2 == 0) {
+        if (tweetsManager.getTweets(Period.startTime + day).sunsetTweets.isEmpty) {
           //putTweetFirstStar(day);
         }
       }
@@ -1743,8 +1735,8 @@ tweetMoonRiseSet();
 
   putTweetLunchTimeContents();
 
-  (words.periodStart until period).foreach { day =>
-    if (tweetsManager.getTweets(startTime + day).size < 3 || !tweetsManager.getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+  (words.periodStart until Period.period).foreach { day =>
+    if (tweetsManager.getTweets(Period.startTime + day).size < 3 || !tweetsManager.getTweets(Period.startTime + day).tweets.map(_.time).exists(isLunchTime)) {
       words.putTweetWord(day, hcs, tweetsManager);
     }
   }
@@ -1763,8 +1755,8 @@ tweetMoonRiseSet();
 
   // なにもツイートのない日付
   def writeEmptyTweets(): Unit = {
-    (0 until period).foreach { day =>
-      val time = startTime + day;
+    (0 until Period.period).foreach { day =>
+      val time = Period.startTime + day;
       if (tweetsManager.getTweets(time).isEmpty) {
         tweetsManager.putTweet(time, "#empty");
       } else {
@@ -1781,10 +1773,10 @@ tweetMoonRiseSet();
   // ツイート出力
   def writeTweets(): Unit = {
     scala.util.Using(new java.io.PrintWriter(new java.io.FileOutputStream(dataPath))) { writer =>
-      (0 until period).foreach { day =>
-        tweetsManager.getTweets(startTime + day).tweets.foreach { case tc =>
+      (0 until Period.period).foreach { day =>
+        tweetsManager.getTweets(Period.startTime + day).tweets.foreach { case tc =>
           val time = tc.time;
-          if (time >= startTime1 && time < endTime1) {
+          if (time >= Period.startTime1 && time < Period.endTime) {
             val msg = tc.tweetContent;
             writer.println("%s %s".format(TimeLib.timeToDateTimeString(time), msg));
           }
