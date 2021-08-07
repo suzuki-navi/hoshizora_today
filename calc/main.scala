@@ -426,45 +426,17 @@ val tweetsManager = new Tweets();
 // 特定の時間に発生する天文の現象
 //==============================================================================
 
-def calcSunLng(time: Double): Double = {
-  val utc = time;
-  val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
-  val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-  val sunLng = VectorLib.xyzToLng(sun2);
-  sunLng;
-}
-def calcSunLng2(time: Double): Double = {
-  val utc = time;
-  val tdb = TimeLib.mjdutcToTdb(utc);
-  val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
-  val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-  val sunLng = VectorLib.xyzToLng(sun2);
-  sunLng;
-}
-
 //--------------------------------------
 // 24節気
 //--------------------------------------
 
-{
-  val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, Period.startTime, Period.endTime, 3.0, 24) { time =>
-    calcSunLng(time);
-  }
-  val termStrs = IndexedSeq(
-    "春分", "清明", "穀雨", "立夏", "小満", "芒種", "夏至", "小暑", "大暑", "立秋", "処暑", "白露",
-    "秋分", "寒露", "霜降", "立冬", "小雪", "大雪", "冬至", "小寒", "大寒", "立春", "雨水", "啓蟄",
-  );
-  sunPhaseTerms.foreach { case (time, term) =>
-    if (term % 6 == 0) {
-      tweetsManager.putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
-    } else {
-      tweetsManager.putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "二十四節気の%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
-    }
-  }
+SolarTerms.tweets.foreach { tw =>
+  tweetsManager.putTweet(tw);
 }
+
+//--------------------------------------
+// 流星群
+//--------------------------------------
 
 {
   val meteorShowerData: (IndexedSeq[(Double, String)], IndexedSeq[(Double, String)]) = {
@@ -491,7 +463,7 @@ def calcSunLng2(time: Double): Double = {
   var day: Int = 0;
   var index: Int = {
     val time = Period.startTime + day + 0.5;
-    val lng = calcSunLng2(time);
+    val lng = JplData.calcPlanetLngMeanEcliptic2000(time, JplData.Sun);
     val index = meteorShowerData._1.indexWhere(_._1 > lng);
     if (index < 0) {
       0;
@@ -501,7 +473,7 @@ def calcSunLng2(time: Double): Double = {
   }
   while (day < Period.period) {
     val time = Period.startTime + day + 0.5;
-    val lng = calcSunLng2(time);
+    val lng = JplData.calcPlanetLngMeanEcliptic2000(time, JplData.Sun);
     val d = MathLib.circleAdd(lng, -meteorShowerData._1(index)._1);
     if (d >= 0) {
       val time1 = time - 1.0 + 20.0 / 60 / 24;
@@ -1608,7 +1580,7 @@ tweetMoonRiseSet();
     val altHor = -0.90 / Const.PI57;
     var index: Int = -1;
     val culminationContents = Constellations.culminationContents;
-    (28 until Period.period).foreach { day => // PERIOD
+    (28 until Period.period).foreach { day => // PERIOD 2021/04/28
       if (index < 0) {
         val time = Period.startTime + day + 20.9 / 24.0; // PERIOD
         val sid = hcs.siderealTimeFromUtc(time);

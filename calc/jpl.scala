@@ -135,18 +135,36 @@ object JplData {
     ret1;
   }
 
-  def calcPlanetFromEarth(time: Double, targetPlanet: JplData.TargetPlanet): Array[Double] = {
+  def calcPlanetFromEarth(tdb: Double, targetPlanet: JplData.TargetPlanet): Array[Double] = {
     val target = targetPlanet match {
-      case JplData.Sun     => calcPlanetPosition(time, JplData.SUN_JPL);
-      case JplData.Moon    => return calcPlanetPosition(time, JplData.MOON_JPL);
-      case JplData.Mercury => calcPlanetPosition(time, JplData.MERCURY_JPL);
-      case JplData.Venus   => calcPlanetPosition(time, JplData.VENUS_JPL);
-      case JplData.Mars    => calcPlanetPosition(time, JplData.MARS_JPL);
-      case JplData.Jupiter => calcPlanetPosition(time, JplData.JUPITER_JPL);
-      case JplData.Saturn  => calcPlanetPosition(time, JplData.SATURN_JPL);
+      case JplData.Sun     => calcPlanetPosition(tdb, JplData.SUN_JPL);
+      case JplData.Moon    => return calcPlanetPosition(tdb, JplData.MOON_JPL);
+      case JplData.Mercury => calcPlanetPosition(tdb, JplData.MERCURY_JPL);
+      case JplData.Venus   => calcPlanetPosition(tdb, JplData.VENUS_JPL);
+      case JplData.Mars    => calcPlanetPosition(tdb, JplData.MARS_JPL);
+      case JplData.Jupiter => calcPlanetPosition(tdb, JplData.JUPITER_JPL);
+      case JplData.Saturn  => calcPlanetPosition(tdb, JplData.SATURN_JPL);
     }
-    val earth = calcEarthPosition(time);
+    val earth = calcEarthPosition(tdb);
     VectorLib.minus(target, earth);
+  }
+
+  def calcPlanetLngTrueEcliptic(utc: Double, targetPlanet: JplData.TargetPlanet): Double = {
+    val tdb = TimeLib.mjdutcToTdb(utc);
+    val planet = JplData.calcPlanetFromEarth(tdb, targetPlanet);
+    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
+    val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
+    val planetLng = VectorLib.xyzToLng(planet2);
+    planetLng;
+  }
+
+  def calcPlanetLngMeanEcliptic2000(utc: Double, targetPlanet: JplData.TargetPlanet): Double = {
+    val tdb = TimeLib.mjdutcToTdb(utc);
+    val planet = JplData.calcPlanetFromEarth(tdb, targetPlanet);
+    val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
+    val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
+    val planetLng = VectorLib.xyzToLng(planet2);
+    planetLng;
   }
 
 }
