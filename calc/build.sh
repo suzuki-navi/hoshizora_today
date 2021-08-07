@@ -8,8 +8,6 @@ if [ ! -e src/main/resources/ascp1950.430 ]; then
     wget ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.430 -O src/main/resources/ascp1950.430
 fi
 
-exit
-
 echo "Starting calculating..."
 
 time sbt run
