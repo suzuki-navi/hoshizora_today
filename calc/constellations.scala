@@ -283,9 +283,9 @@ class Words() {
     }
   }
 
-  private def findRecentWord(day: Int, hcs: Hcs): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
+  private def findRecentWord(day: Int, hcs: Hcs, tweets: Tweets): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
     val time = Main.startTime + day + 12.0 / 24;
-    val lastTweets = (-13 to 0).flatMap(i => Main.getTweets(Main.startTime + day + i).tweets);
+    val lastTweets = (-13 to 0).flatMap(i => tweets.getTweets(Main.startTime + day + i).tweets);
     val lst = lastTweets.flatMap(_.starNames);
     if (lst.nonEmpty) {
       import Ordering.Double.IeeeOrdering;
@@ -306,8 +306,8 @@ class Words() {
     history = history + (word -> (day :: days, limit));
   }
 
-  def putTweetWord(day: Int, hcs: Hcs): Unit = {
-    findRecentWord(day, hcs) match {
+  def putTweetWord(day: Int, hcs: Hcs, tweets: Tweets): Unit = {
+    findRecentWord(day, hcs, tweets) match {
       case None => ;
       case Some((word, contents)) =>
         val time1 = Main.startTime + day + (12.0 + 50.0 / 60) / 24;
@@ -316,7 +316,7 @@ class Words() {
           val c = content.content(day + inc / 4, hcs);
           if (c != "") {
             val msg = c + content.hashtags.map(" #" + _).mkString("");
-            Main.putTweet(time1 + 1.0 * (inc % 4) / 24, msg, content.urlOpt);
+            tweets.putTweet(time1 + 1.0 * (inc % 4) / 24, msg, content.urlOpt);
             if (inc == 0) {
               addHistory(word, day + inc / 4);
             }

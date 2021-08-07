@@ -195,7 +195,7 @@ def tweetMoonRiseSet(): Unit = {
         }
       }
       val riseset = touchMoonRiseSetStr(time2).get;
-      putTweet(time2, riseset);
+      tweetsManager.putTweet(time2, riseset);
     }
   }
 }
@@ -400,43 +400,7 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
 // ツイート管理
 //==============================================================================
 
-var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
-  val date = TimeLib.timeToDateString(startTime + day);
-  (date, DateTweets());
-}.toMap;
-
-def getTweets(time: Double): DateTweets = {
-  val date = TimeLib.timeToDateString(time);
-  _tweets.getOrElse(date, DateTweets());
-}
-
-def putTweet(tc: TweetContent): Unit = {
-  val date = TimeLib.timeToDateString(tc.time);
-  if (_tweets.contains(date)) {
-    val tw = _tweets(date);
-    _tweets = _tweets.updated(date, tw.added(tc));
-  }
-}
-
-def putTweet(time: Double, msg: String): Unit = {
-  putTweet(LegacyTweetContent(time, msg, None, Nil));
-}
-
-def putTweet(time: Double, msg: String, urlOpt: Option[String]): Unit = {
-  putTweet(LegacyTweetContent(time, msg, urlOpt, Nil));
-}
-
-def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
-  putTweet(LegacyTweetContent(time, msg, None, starNames));
-}
-
-def removeTweet(time: Double, message: String): Unit = {
-  val date = TimeLib.timeToDateString(time);
-  if (_tweets.contains(date)) {
-    val tw = _tweets(date);
-    _tweets = _tweets.updated(date, tw.removed(time, message));
-  }
-}
+val tweetsManager = new Tweets(startTime, period);
 
 //==============================================================================
 // 祝日・記念日
@@ -454,12 +418,12 @@ def removeTweet(time: Double, message: String): Unit = {
         (yearStart to yearEnd).foreach { year =>
           val timeStr = year.toString + cols(0).substring(4);
           val time = TimeLib.stringToModifiedJulianDay(timeStr + ":00+09:00");
-          putTweet(time, msg);
+          tweetsManager.putTweet(time, msg);
         }
       } else {
         val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
         val msg = cols(1);
-        putTweet(time, msg);
+        tweetsManager.putTweet(time, msg);
       }
     }
   }
@@ -503,9 +467,9 @@ def calcSunLng2(time: Double): Double = {
   );
   sunPhaseTerms.foreach { case (time, term) =>
     if (term % 6 == 0) {
-      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
+      tweetsManager.putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
     } else {
-      putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "二十四節気の%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
+      tweetsManager.putTweet(TimeLib.floor(time, 24) + 1.0 / (24 * 4), "二十四節気の%s。太陽の黄経が%d°です".format(termStrs(term), term * 15));
     }
   }
 }
@@ -551,7 +515,7 @@ def calcSunLng2(time: Double): Double = {
       val time1 = time - 1.0 + 20.0 / 60 / 24;
       val name = meteorShowerData._1(index)._2;
       val msg = "%sは今夜が極大。%s".format(name, moonRiseSetForMeteorShower(time1));
-      putTweet(time1, msg);
+      tweetsManager.putTweet(time1, msg);
       index += 1;
       if (index == meteorShowerData._1.size) {
         index = 0;
@@ -562,7 +526,7 @@ def calcSunLng2(time: Double): Double = {
   }
 
   meteorShowerData._2.foreach { case (time, msg) =>
-    putTweet(time, msg);
+    tweetsManager.putTweet(time, msg);
   }
 }
 
@@ -647,28 +611,28 @@ def calcSunLng2(time: Double): Double = {
       } else {
         MoonPhaseTermTweetContent(time, 4, 0, calcMoonConstellation(time));
       }
-    }.foreach(putTweet);
+    }.foreach(tweetsManager.putTweet);
 
     val midAltData = moonRiseSetTimesData.filter(_._5 == 4).map(t => (t._2, t._4));
     (0 until midAltData.size).foreach { i =>
       val (time, alt) = midAltData(i);
       if (i > 0 && i < midAltData.size - 1) {
         if (midAltData(i - 1)._2 <= alt && midAltData(i + 1)._2 < alt) {
-          putTweet(time, "満月が南中(高度%.0f°)。冬の満月は空高く上り、今日はこの冬でもっとも天頂に近い満月です".format(alt * Const.PI57));
+          tweetsManager.putTweet(time, "満月が南中(高度%.0f°)。冬の満月は空高く上り、今日はこの冬でもっとも天頂に近い満月です".format(alt * Const.PI57));
         } else if (midAltData(i - 1)._2 >= alt && midAltData(i + 1)._2 > alt) {
-          putTweet(time, "満月が南中(高度%.0f°)。夏の満月は空低く、今日はこの夏でもっとも低い満月です".format(alt * Const.PI57));
+          tweetsManager.putTweet(time, "満月が南中(高度%.0f°)。夏の満月は空低く、今日はこの夏でもっとも低い満月です".format(alt * Const.PI57));
         } else {
-          putTweet(time, "満月が南中(高度%.0f°)".format(alt * Const.PI57));
+          tweetsManager.putTweet(time, "満月が南中(高度%.0f°)".format(alt * Const.PI57));
         }
       } else {
-        putTweet(time, "満月が南中(高度%.0f°)".format(alt * Const.PI57));
+        tweetsManager.putTweet(time, "満月が南中(高度%.0f°)".format(alt * Const.PI57));
       }
     }
   }
 
   moonPhaseTerms.filter(_._2 != 4).filter(_._2 % 2 == 0).map { case (time, term) =>
     MoonPhaseTermTweetContent(time, term, 0, calcMoonConstellation(time));
-  }.foreach(putTweet);
+  }.foreach(tweetsManager.putTweet);
 }
 
 //--------------------------------------
@@ -682,7 +646,7 @@ MathLib.findMaxMinListContinuous(startTime, endTime, 30, 24) { time =>
   VectorLib.distance(sun);
 }.foreach { case (time, flag) =>
   val s = if (flag < 0) "近日点" else "遠日点";
-  putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
+  tweetsManager.putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
 }
 
 //--------------------------------------
@@ -715,16 +679,16 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
       calcInnerPlanetLngEc(time, targetPlanet);
     }.map { case (time, term) =>
       if (term == 0) {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
           "水星が外合(黄経基準)", planetName));
       } else if (term == 1) {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
           "水星が東方最大離角(黄経基準)\uD83C\uDF13", planetName));
       } else if (term == 2) {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
           "水星が内合(黄経基準)", planetName));
       } else {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
           "水星が西方最大離角(黄経基準)\uD83C\uDF17", planetName));
       }
     }
@@ -736,16 +700,16 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
       calcInnerPlanetLngEc(time, targetPlanet);
     }.map { case (time, term) =>
       if (term == 0) {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
           "金星が外合(黄経基準)。数か月後に夕方の西の空に現れます", planetName));
       } else if (term == 1) {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
           "金星が東方最大離角(黄経基準)\uD83C\uDF13。宵の明星として夕方に西の空にいます", planetName));
       } else if (term == 2) {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.floor(time, 24) + 1.0 / (24 * 4),
           "金星が内合(黄経基準)。数週間後に明け方の東の空に現れます", planetName));
       } else {
-        putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
+        tweetsManager.putTweet(PlanetAstronomyTweetContent(TimeLib.round(time, 24) - 1.0 / (24 * 4),
           "金星が西方最大離角(黄経基準)\uD83C\uDF17。明けの明星として明け方に東の空にいます", planetName));
       }
     }
@@ -813,7 +777,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
         PlanetAstronomyTweetContent(time2, "%sが%s。%sにいます%s".format(planetName, content, cons, nextSeasonMsg) +
           hashtags.map(" #" + _).mkString, planetName);
     }
-    putTweet(tweet);
+    tweetsManager.putTweet(tweet);
   }
 }
 
@@ -987,7 +951,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
     }.foreach { case (day, flag) =>
       if (flag > 0) {
         val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
-        putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, false, false, true));
+        tweetsManager.putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, false, false, true));
       }
     }
   }
@@ -1008,7 +972,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
         if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
           val day = (moonPhaseTime + d - startTime).toInt;
           val (azi, alt) = calcPlanetOnSunsetTime(day, JplData.Moon);
-          putTweet(SunsetMoonTweetContent(day, azi, alt));
+          tweetsManager.putTweet(SunsetMoonTweetContent(day, azi, alt));
         }
       }
     }
@@ -1026,14 +990,14 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
   innerPlanets.zipWithIndex.foreach { case (planet, pi) =>
     (1 until period).foreach { day =>
       val wday = TimeLib.wday(startTime + day);
-      val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+      val sunsetTweets = tweetsManager.getTweets(startTime + day).sunsetTweets;
       if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
         val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
         if (alt >= altThres0) {
           val prevAlt = innerPlanetsSunsetAziAltList(pi)(day - 1)._2;
           val isIncreasing = (alt >= prevAlt + diffThreashold);
           val isDecreasing = (alt <= prevAlt - diffThreashold);
-          putTweet(SunsetPlanetTweetContent(day, planet._1, azi, alt, isIncreasing, isDecreasing, false));
+          tweetsManager.putTweet(SunsetPlanetTweetContent(day, planet._1, azi, alt, isIncreasing, isDecreasing, false));
         }
       }
     }
@@ -1050,7 +1014,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
   val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
   val planets2 = IndexedSeq(("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn));
   (1 until period).foreach { day =>
-    val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+    val sunsetTweets = tweetsManager.getTweets(startTime + day).sunsetTweets;
     if (sunsetTweets.nonEmpty) {
       planets.foreach { p =>
         if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
@@ -1059,7 +1023,7 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
             val (_, prevAlt) = calcPlanetOnSunsetTime(day - 1, p._2);
             val isIncreasing = (alt >= prevAlt + diffThreashold);
             val isDecreasing = (alt <= prevAlt - diffThreashold);
-            putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, isDecreasing, false));
+            tweetsManager.putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, isIncreasing, isDecreasing, false));
           }
         }
       };
@@ -1068,14 +1032,14 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
         if (!sunsetTweets.exists(_.starNames.contains(p._1))) {
           val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
           if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-            putTweet(SunsetMoonTweetContent(day, azi, alt));
+            tweetsManager.putTweet(SunsetMoonTweetContent(day, azi, alt));
           }
         }
       }
       planets2.foreach { p =>
           val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
           if (azi >= aziThres0 && azi <= aziThres1 && alt >= altThres0) {
-            putTweet(SunsetStarTweetContent(day, p._1, azi, alt));
+            tweetsManager.putTweet(SunsetStarTweetContent(day, p._1, azi, alt));
           }
       };
     }
@@ -1105,13 +1069,13 @@ def calcNextSeason(aziAltList: IndexedSeq[(Double, Double)], day: Int): (Int, In
     (1 until period).foreach { day =>
       if ((startTime + day).toInt % 2 == 0) {
         val wday = TimeLib.wday(startTime + day);
-        val sunsetTweets = getTweets(startTime + day).sunsetTweets;
+        val sunsetTweets = tweetsManager.getTweets(startTime + day).sunsetTweets;
         if (wday == planet._3 && !sunsetTweets.exists(_.starNames.contains(planet._1))) {
           val (azi, alt) = innerPlanetsSunsetAziAltList(pi)(day);
           if (alt < altThres) {
             val time = startTime + day + 12.5 / 24;
             val (p1, p2) = calcNextSeason(innerPlanetsSunsetAziAltList(pi), day);
-            putTweet(SunsetNextPlanetTweetContent(time, planet._1, p1, p2));
+            tweetsManager.putTweet(SunsetNextPlanetTweetContent(time, planet._1, p1, p2));
           }
         }
       }
@@ -1126,7 +1090,7 @@ def calcNextSeason(aziAltList: IndexedSeq[(Double, Double)], day: Int): (Int, In
   }.zipWithIndex.foreach { case (flag, day) =>
     val wday = TimeLib.wday(startTime + day);
     if (flag == 1 || flag == 3 || wday == 0) {
-      putTweet(SunsetTweetContent(day, flag));
+      tweetsManager.putTweet(SunsetTweetContent(day, flag));
     }
   }
 }
@@ -1186,7 +1150,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           val xyz_s = slowStarXyzFunc(tdb);
           val distance = VectorLib.angularDistance(xyz_s, xyz_f);
           if (distance < distanceThresMoon) {
-            putTweet(CloseStarsTweetContent(time, 24 * 6, slowStarName, fastStarName, distance, hashtags));
+            tweetsManager.putTweet(CloseStarsTweetContent(time, 24 * 6, slowStarName, fastStarName, distance, hashtags));
           }
         }
       }
@@ -1211,7 +1175,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
         if (distance < distanceThres) {
           getConjunctionTweetTime(time, xyz_f) match {
             case Some(postTime) =>
-              putTweet(CloseStarsTweetContent(postTime, 24, slowStarName, fastStarName, distance, hashtags));
+              tweetsManager.putTweet(CloseStarsTweetContent(postTime, 24, slowStarName, fastStarName, distance, hashtags));
             case None =>
               // nop
           }
@@ -1302,7 +1266,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
   val altThres = 10 / Const.PI57;
   (0 until period).foreach { d =>
     val time = startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
-    if (!getTweets(time).tweets.filter(tc => isNightTime0(tc.time)).flatMap(_.starNames).contains("月")) {
+    if (!tweetsManager.getTweets(time).tweets.filter(tc => isNightTime0(tc.time)).flatMap(_.starNames).contains("月")) {
       {
         val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
         if (alt >= altThres) {
@@ -1322,10 +1286,10 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
           val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
           if (azi >= Const.PI) {
-            putTweet(time, "月は%s、%sにいます。%s".format(hcsStr, cons, calcMoonPhaseString(time)) +
+            tweetsManager.putTweet(time, "月は%s、%sにいます。%s".format(hcsStr, cons, calcMoonPhaseString(time)) +
               hashtags.map(" #" + _).mkString);
           } else {
-            putTweet(time, "月は%s、%sにいます".format(hcsStr, cons) +
+            tweetsManager.putTweet(time, "月は%s、%sにいます".format(hcsStr, cons) +
               hashtags.map(" #" + _).mkString);
           }
       }
@@ -1372,7 +1336,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
           case Some((time, xyz, azi, alt)) =>
             val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
             val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
-            putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
+            tweetsManager.putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
               hashtags.map(" #" + _).mkString);
         }
     }
@@ -1387,10 +1351,10 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
     (0 until period).foreach { day =>
       if ((startTime + day).toInt % 2 == 0) {
         val wday = TimeLib.wday(startTime + day);
-        val tweets = getTweets(startTime + day).tweets;
+        val tweets = tweetsManager.getTweets(startTime + day).tweets;
         if (wday == planet._3 && !tweets.exists(_.starNames.contains(planet._1))) {
           if (!(-6 to +6).exists { i =>
-            getTweets(startTime + day + i).tweets.exists {
+            tweetsManager.getTweets(startTime + day + i).tweets.exists {
               case PlanetAstronomyTweetContent(_, _, planetName) if (planetName == planet._1) => true;
               case _ => false;
             }
@@ -1399,7 +1363,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
             if (alt < altThres) {
               val time = startTime + day + 12.5 / 24;
               val (p1, p2) = calcNextSeason(outerPlanetsNightAziAltList(pi), day);
-              putTweet(NightNextPlanetTweetContent(time, planet._1, p1, p2));
+              tweetsManager.putTweet(NightNextPlanetTweetContent(time, planet._1, p1, p2));
             }
           }
         }
@@ -1440,10 +1404,10 @@ tweetMoonRiseSet();
     diffData.reverse.sortBy(_._1);
   }
   diffData.filter(_._2 < 0).foreach { d =>
-    removeTweet(d._1, d._3);
+    tweetsManager.removeTweet(d._1, d._3);
   }
   diffData.filter(_._2 > 0).foreach { d =>
-    putTweet(d._1, d._3);
+    tweetsManager.putTweet(d._1, d._3);
   }
 }
 
@@ -1476,7 +1440,7 @@ tweetMoonRiseSet();
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
     val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見えやすい星座は、%sです #星空 #星座".format(constellationsStr);
-    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+    tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
   // この時期21時ごろ見える南の空低い星座
@@ -1502,7 +1466,7 @@ tweetMoonRiseSet();
       val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
       val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ南の低い空に見える星座は、%sです #星空 #星座".format(constellationsStr);
-      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
       true;
     } else {
       false;
@@ -1537,7 +1501,7 @@ tweetMoonRiseSet();
     val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
     val starNames = constellations.sortBy(-_._1).map(_._2).toList;
     val msg = "この時期21時ごろ見える明るい星は、%sです #星空".format(constellationsStr);
-    putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+    tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
   }
 
   // この時期日没時の一番星となりうる明るい星
@@ -1585,7 +1549,7 @@ tweetMoonRiseSet();
       }.mkString("、");
       val starNames = constellations.map(_._3).toList;
       val msg = "この時期日没時の一番星となりうる明るい星は、%sです".format(constellationsStr);
-      putTweet(SunsetFirstStarTweetContent(day, msg, starNames));
+      tweetsManager.putTweet(SunsetFirstStarTweetContent(day, msg, starNames));
     }
   }
 
@@ -1611,7 +1575,7 @@ tweetMoonRiseSet();
       }.mkString("、");
       val starNames = constellations.sortBy(-_._2).map(_._3).toList;
       val msg = "この時期21時ごろ見えやすい黄道十二星座は、%sです #星空 #星座".format(constellationsStr);
-      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
       true;
     } else {
       false;
@@ -1640,7 +1604,7 @@ tweetMoonRiseSet();
       val constellationsStr = constellations.sortBy(_._1).map(_._2).mkString("、");
       val starNames = constellations.sortBy(-_._1).map(_._2).toList;
       val msg = "この時期21時ごろ見える天の川は、%sを通っています #星空 #星座".format(constellationsStr);
-      putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
+      tweetsManager.putTweet(startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
       true;
     } else {
       false;
@@ -1666,7 +1630,7 @@ tweetMoonRiseSet();
         val time1 = hcs.siderealTimeToUtc(culminationContents(index)._1, timeS);
         val time0 = if (time1 < timeS) {
           time1;
-        } else if (getTweets(timeS).tweets.map(_.time).filter(isNightTime3).isEmpty) {
+        } else if (tweetsManager.getTweets(timeS).tweets.map(_.time).filter(isNightTime3).isEmpty) {
           if (time1 < timeE) {
             time1;
           } else {
@@ -1684,7 +1648,7 @@ tweetMoonRiseSet();
           val urlOpt = culminationContents(index)._3;
           val hashtags = culminationContents(index)._4;
           val starNames = culminationContents(index)._5;
-          putTweet(StarTweetContent(time0, msg, urlOpt, hashtags, starNames));
+          tweetsManager.putTweet(StarTweetContent(time0, msg, urlOpt, hashtags, starNames));
           index += 1;
           if (index == culminationContents.size) {
             index = 0;
@@ -1715,14 +1679,14 @@ tweetMoonRiseSet();
         val msg = lunchTimeContents(index)._2;
         {
           val p = (day1 until (day2 + 14)).indexWhere { d =>
-            !getTweets(startTime + d).tweets.exists(tc => DateTweets.isDayTime(tc.time));
+            !tweetsManager.getTweets(startTime + d).tweets.exists(tc => DateTweets.isDayTime(tc.time));
           }
           day1 = if (p < 0) day1 else day1 + p;
         }
         val urlOpt = lunchTimeContents(index)._3;
         val hashtags = lunchTimeContents(index)._4;
         val starNames = Nil;
-        putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
+        tweetsManager.putTweet(StarTweetContent(startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
         index += 1;
         if (index == lunchTimeContents.size) {
           index = 0;
@@ -1770,7 +1734,7 @@ tweetMoonRiseSet();
     val wday = TimeLib.wday(startTime + day);
     if (wday == 1) {
       if ((startTime + day).toInt % 2 == 0) {
-        if (getTweets(startTime + day).sunsetTweets.isEmpty) {
+        if (tweetsManager.getTweets(startTime + day).sunsetTweets.isEmpty) {
           //putTweetFirstStar(day);
         }
       }
@@ -1780,8 +1744,8 @@ tweetMoonRiseSet();
   putTweetLunchTimeContents();
 
   (words.periodStart until period).foreach { day =>
-    if (getTweets(startTime + day).size < 3 || !getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
-      words.putTweetWord(day, hcs);
+    if (tweetsManager.getTweets(startTime + day).size < 3 || !tweetsManager.getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
+      words.putTweetWord(day, hcs, tweetsManager);
     }
   }
 }
@@ -1801,14 +1765,14 @@ tweetMoonRiseSet();
   def writeEmptyTweets(): Unit = {
     (0 until period).foreach { day =>
       val time = startTime + day;
-      if (getTweets(time).isEmpty) {
-        putTweet(time, "#empty");
+      if (tweetsManager.getTweets(time).isEmpty) {
+        tweetsManager.putTweet(time, "#empty");
       } else {
-        //if (getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
-        if (getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
-          putTweet(time + 23.0 / 24, "#night empty");
-        } else if (!getTweets(time).tweets.exists(tc => DateTweets.isDayTime(tc.time))) {
-          putTweet(time + 9.0 / 24, "#daytime empty");
+        //if (tweetsManager.getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
+        if (tweetsManager.getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
+          tweetsManager.putTweet(time + 23.0 / 24, "#night empty");
+        } else if (!tweetsManager.getTweets(time).tweets.exists(tc => DateTweets.isDayTime(tc.time))) {
+          tweetsManager.putTweet(time + 9.0 / 24, "#daytime empty");
         }
       }
     }
@@ -1818,7 +1782,7 @@ tweetMoonRiseSet();
   def writeTweets(): Unit = {
     scala.util.Using(new java.io.PrintWriter(new java.io.FileOutputStream(dataPath))) { writer =>
       (0 until period).foreach { day =>
-        getTweets(startTime + day).tweets.foreach { case tc =>
+        tweetsManager.getTweets(startTime + day).tweets.foreach { case tc =>
           val time = tc.time;
           if (time >= startTime1 && time < endTime1) {
             val msg = tc.tweetContent;

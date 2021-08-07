@@ -88,3 +88,45 @@ object DateTweets {
 
 }
 
+class Tweets(startTime: Double, period: Int) {
+
+  var _tweets: Map[String, DateTweets] = (0 until period).map { day =>
+    val date = TimeLib.timeToDateString(startTime + day);
+    (date, DateTweets());
+  }.toMap;
+
+  def getTweets(time: Double): DateTweets = {
+    val date = TimeLib.timeToDateString(time);
+    _tweets.getOrElse(date, DateTweets());
+  }
+
+  def putTweet(tc: TweetContent): Unit = {
+    val date = TimeLib.timeToDateString(tc.time);
+    if (_tweets.contains(date)) {
+      val tw = _tweets(date);
+      _tweets = _tweets.updated(date, tw.added(tc));
+    }
+  }
+
+  def putTweet(time: Double, msg: String): Unit = {
+    putTweet(LegacyTweetContent(time, msg, None, Nil));
+  }
+
+  def putTweet(time: Double, msg: String, urlOpt: Option[String]): Unit = {
+    putTweet(LegacyTweetContent(time, msg, urlOpt, Nil));
+  }
+
+  def putTweet(time: Double, msg: String, starNames: List[String]): Unit = {
+    putTweet(LegacyTweetContent(time, msg, None, starNames));
+  }
+
+  def removeTweet(time: Double, message: String): Unit = {
+    val date = TimeLib.timeToDateString(time);
+    if (_tweets.contains(date)) {
+      val tw = _tweets(date);
+      _tweets = _tweets.updated(date, tw.removed(time, message));
+    }
+  }
+
+}
+
