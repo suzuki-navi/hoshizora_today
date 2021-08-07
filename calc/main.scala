@@ -1650,10 +1650,10 @@ tweetMoonRiseSet();
     }
   }
 
-  // 星座の解説など
+  // 星座の解説など(かんむり座のパターン)
   def putTweetLunchTimeContents(): Unit = {
     val lunchTimeContents = Constellations.lunchTimeContents;
-    var day1: Int = 3; // PERIOD 2021/04/03
+    var day1: Int = 123; // PERIOD 2021/08/01
     var day2: Int = day1;
     var index: Int = {
       val time = Period.startTime + day1 + 21.0 / 24.0;
@@ -1666,26 +1666,29 @@ tweetMoonRiseSet();
       }
     }
     while (day1 < Period.period) {
-      val sid = hcs.siderealTimeFromUtc(Period.startTime + day1 + 21.0 / 24);
+      val sid = hcs.siderealTimeFromUtc(Period.startTime + day2 + 21.0 / 24);
       if (MathLib.circleDiff1(sid, lunchTimeContents(index)._1) >= 0) {
         val msg = lunchTimeContents(index)._2;
         {
-          val p = (day1 until (day2 + 14)).indexWhere { d =>
+          val p = (day2 until (day1 + 14)).indexWhere { d =>
             !tweetsManager.getTweets(Period.startTime + d).tweets.exists(tc => DateTweets.isDayTime(tc.time));
           }
-          day1 = if (p < 0) day1 else day1 + p;
+          day2 = if (p < 0) day2 else day2 + p;
         }
         val urlOpt = lunchTimeContents(index)._3;
         val hashtags = lunchTimeContents(index)._4;
         val starNames = Nil;
-        tweetsManager.putTweet(StarTweetContent(Period.startTime + day1 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
+        tweetsManager.putTweet(StarTweetContent(Period.startTime + day2 + 12.0 / 24 + 5.0 / 60 / 24, msg, urlOpt, hashtags, starNames));
         index += 1;
         if (index == lunchTimeContents.size) {
           index = 0;
         }
+        day2 += 1;
       }
       day1 += 1;
-      day2 += 1;
+      if (day2 < day1) {
+        day2 = day1;
+      }
     }
   }
 

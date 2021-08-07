@@ -63,8 +63,12 @@ object Constellations {
     var constellationsMap: Map[String, (String, List[String])] = Map.empty;
     source.getLines.foreach { line =>
       if (!line.startsWith("#") && line.length > 7) {
+        // 赤経の文字列
         val raStr = line.substring(0, 6);
+
+        // content0は赤経の部分以外の文字列
         val (content0: String, urlOpt: Option[String], hashtags: List[String], starNames: List[String]) = parseContent(line.substring(7));
+
         def calcRa(raStr: String): Double = {
           (raStr.substring(0, 2).toInt.toDouble + raStr.substring(3, 5).toInt.toDouble / 60) / 24 * PI2;
         }
