@@ -11,7 +11,6 @@ val period = (endTime - startTime).toInt;
 
 
 val jplDataPath = "../var/ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.430";
-val constellationsDataPath = "constellations.txt";
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
 val diffDataPath = "diff.txt";
@@ -29,8 +28,8 @@ System.err.println("Started calculating...");
 
 val jplData = new JplData(jplDataPath);
 val hcs = new Hcs(tokyoLng, tokyoLat);
-val constellationData = new Constellations(constellationsDataPath);
-val words = new Words(constellationData);
+val constellationData = Constellations;
+val words = new Words();
 words.loadHistory(wordHistoryPath);
 
 //==============================================================================

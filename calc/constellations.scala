@@ -2,6 +2,7 @@
 object Constellations {
 
   val PI57 = 180.0 / Math.PI;
+  val PI2 = Math.PI * 2.0;
 
   case class Constellation (ra: Double, dec: Double, xyz: Array[Double], name: String, hashtags: List[String],
     eclipticalFlag: Boolean, galaxyFlag: Boolean);
@@ -19,13 +20,6 @@ object Constellations {
     }
     cons;
   }
-
-}
-
-class Constellations(constellationsDataPath: String) {
-
-  val PI57 = 180.0 / Math.PI;
-  val PI2 = Math.PI * 2.0;
 
   val (culminationContents, lunchTimeContents, lunchTimeContents2, constellationData, starData, starData2, constellationsMap) = {
     import Ordering.Double.IeeeOrdering;
@@ -57,7 +51,9 @@ class Constellations(constellationsDataPath: String) {
       (content0, urlOpt, hashtags.reverse, starNames.reverse);
     }
 
-    val source = scala.io.Source.fromFile(constellationsDataPath);
+    val constellationsDataPath = "constellations.txt";
+    val source = scala.io.Source.fromInputStream(
+      getClass.getClassLoader.getResourceAsStream(constellationsDataPath));
     var culminationContents: List[(Double, String, Option[String], List[String], List[String])] = Nil;
     var lunchTimeContents:   List[(Double, String, Option[String], List[String])] = Nil;
     var lunchTimeContents2:   List[Words.ConstellationLunchTimeContent] = Nil;
@@ -216,10 +212,10 @@ object Words {
 
 }
 
-class Words(constellationData: Constellations) {
+class Words() {
 
   private def fetchLunchTimeContents(word: String): IndexedSeq[Words.LunchTimeContent] = {
-    constellationData.lunchTimeContents2.filter(_.word == word);
+    Constellations.lunchTimeContents2.filter(_.word == word);
   }
 
   private val defaultLimit = 25;
