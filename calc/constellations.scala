@@ -164,7 +164,7 @@ object Words {
 
   trait LunchTimeContent {
     def word: String;
-    def content(day: Int, bpn: Bpn, hcs: Hcs): String;
+    def content(day: Int, hcs: Hcs): String;
     def urlOpt: Option[String];
     def hashtags: List[String];
   }
@@ -172,11 +172,11 @@ object Words {
   case class ConstellationLunchTimeContent (word: String, contentTemplate: String,
     urlOpt: Option[String], hashtags: List[String],
     ra: Double, dec: Double, xyz: Array[Double]) extends LunchTimeContent {
-    def content(day: Int, bpn: Bpn, hcs: Hcs): String = {
+    def content(day: Int, hcs: Hcs): String = {
       val altHor = -0.90 / PI57;
       val time = Main.startTime + day + 21.0 / 24;
       val tdb = TimeLib.mjdutcToTdb(time);
-      val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt < altHor) {
@@ -287,7 +287,7 @@ class Words(constellationData: Constellations) {
     }
   }
 
-  private def findRecentWord(day: Int, bpn: Bpn, hcs: Hcs): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
+  private def findRecentWord(day: Int, hcs: Hcs): Option[(String, IndexedSeq[Words.LunchTimeContent])] = {
     val time = Main.startTime + day + 12.0 / 24;
     val lastTweets = (-13 to 0).flatMap(i => Main.getTweets(Main.startTime + day + i).tweets);
     val lst = lastTweets.flatMap(_.starNames);
@@ -295,7 +295,7 @@ class Words(constellationData: Constellations) {
       import Ordering.Double.IeeeOrdering;
       val lst2 = lst.map { w => (w, tweetPoint(w, day)) }.sortBy(- _._2._2);
       lst2.find { case (word, (contents, point)) =>
-        point >= 1.0 && contents.filter(_.content(day, bpn, hcs) != "").nonEmpty;
+        point >= 1.0 && contents.filter(_.content(day, hcs) != "").nonEmpty;
       } match {
         case Some((word, (contents, point))) => Some((word, contents));
         case _ => None;
@@ -310,14 +310,14 @@ class Words(constellationData: Constellations) {
     history = history + (word -> (day :: days, limit));
   }
 
-  def putTweetWord(day: Int, bpn: Bpn, hcs: Hcs): Unit = {
-    findRecentWord(day, bpn, hcs) match {
+  def putTweetWord(day: Int, hcs: Hcs): Unit = {
+    findRecentWord(day, hcs) match {
       case None => ;
       case Some((word, contents)) =>
         val time1 = Main.startTime + day + (12.0 + 50.0 / 60) / 24;
         var inc: Int = 0;
         contents.foreach { content =>
-          val c = content.content(day + inc / 4, bpn, hcs);
+          val c = content.content(day + inc / 4, hcs);
           if (c != "") {
             val msg = c + content.hashtags.map(" #" + _).mkString("");
             Main.putTweet(time1 + 1.0 * (inc % 4) / 24, msg, content.urlOpt);

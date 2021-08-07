@@ -11,8 +11,6 @@ val period = (endTime - startTime).toInt;
 
 
 val jplDataPath = "../var/ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/ascp1950.430";
-val nutLsDataPath = "../static/nut-ls.txt";
-val nutPlDataPath = "../static/nut-pl.txt";
 val constellationsDataPath = "constellations.txt";
 val holidayDataPath = "holiday.txt";
 val meteorDataPath = "meteor.txt";
@@ -28,8 +26,6 @@ val tokyoLng = 139.7 / Const.PI57;
 val tokyoLat = 35.7 / Const.PI57;
 
 System.err.println("Started calculating...");
-
-val bpn = new Bpn(nutLsDataPath, nutPlDataPath);
 
 val jplData = new JplData(jplDataPath);
 val hcs = new Hcs(tokyoLng, tokyoLat);
@@ -47,13 +43,13 @@ val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, td
     val time = Lib2.findCrossingBoundaryTime(altHor, true, false, startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       val tdb = TimeLib.mjdutcToTdb(time);
       val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-      val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(sun2, time);
       alt;
     }
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     (time, tdb, bpnMatrix);
   }
 }
@@ -70,7 +66,7 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
 def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Array[Double], Double, Double) = {
   val tdb = TimeLib.mjdutcToTdb(time);
   val ut1 = time; // 近似的
-  val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+  val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
   val xyz = jplData.calcPlanetFromEarth(tdb, targetPlanet);
   val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
   val azialt = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -241,7 +237,7 @@ def calcMoonLng(time: Double): Double = {
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
   val moon = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
-  val bpnMatrix = bpn.icrsToTrueEclipticMatrix(tdb);
+  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val moon2 = VectorLib.multiplyMV(bpnMatrix, moon);
   val sunLng = VectorLib.xyzToLng(sun2);
@@ -380,7 +376,7 @@ def getConjunctionTweetTime(time: Double, xyz: Array[Double]): Option[Double] = 
   } else {
     val time21 = time.toInt + 0.5;
     val tdb21 = TimeLib.mjdutcToTdb(time21);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb21);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb21);
     val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
     val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time21);
     if (alt >= altThres0) {
@@ -484,7 +480,7 @@ def calcSunLng(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val bpnMatrix = bpn.icrsToTrueEclipticMatrix(tdb);
+  val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
   sunLng;
@@ -493,7 +489,7 @@ def calcSunLng2(time: Double): Double = {
   val utc = time;
   val tdb = TimeLib.mjdutcToTdb(utc);
   val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
-  val bpnMatrix = bpn.icrsToMeanEclipticMatrix2000;
+  val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
   val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
   val sunLng = VectorLib.xyzToLng(sun2);
   sunLng;
@@ -626,7 +622,7 @@ def calcSunLng2(time: Double): Double = {
     if (isNightTime2(time)) {
       val tdb = TimeLib.mjdutcToTdb(time);
       val xyz = jplData.calcPlanetFromEarth(tdb, JplData.Moon);
-      val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
       if (alt >= altThres0) {
@@ -710,7 +706,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     val tdb = TimeLib.mjdutcToTdb(utc);
     val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
     val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-    val bpnMatrix = bpn.icrsToTrueEclipticMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
     val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
     val sunLng = VectorLib.xyzToLng(sun2);
@@ -768,7 +764,7 @@ case class PlanetAstronomyTweetContent(time: Double, message: String, planetName
     val tdb = TimeLib.mjdutcToTdb(utc);
     val sun = jplData.calcPlanetFromEarth(tdb, JplData.Sun);
     val planet = jplData.calcPlanetFromEarth(tdb, targetPlanet);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
     val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
     val sunLng = VectorLib.xyzToLng(sun2);
@@ -1189,7 +1185,7 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       if (flag > 0 && isNightTime2(time)) {
         val tdb = TimeLib.mjdutcToTdb(time);
         val xyz_f = fastStarXyzFunc(tdb);
-        val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+        val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
         val xyz_f2 = VectorLib.multiplyMV(bpnMatrix, xyz_f);
         val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz_f2, time);
         if (alt >= altThres0) {
@@ -1473,7 +1469,7 @@ tweetMoonRiseSet();
     val altThres = 30.0 / Const.PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -1494,7 +1490,7 @@ tweetMoonRiseSet();
     val decThres = - Const.PI5 + tokyoLat + 30.0 / Const.PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.flatMap { constellation =>
       if (constellation.dec < decThres) {
         val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
@@ -1525,7 +1521,7 @@ tweetMoonRiseSet();
     //val altThres = 0.0;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = (constellationData.starData.flatMap { case (ra, xyz, name, hashtags) =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -1557,7 +1553,7 @@ tweetMoonRiseSet();
     //val altThres = 0.0;
     val time = sunsetTimes(day);
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations0 = ((constellationData.starData2.flatMap { case (ra, xyz, magnitude, name, hashtags) =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -1604,7 +1600,7 @@ tweetMoonRiseSet();
     val altThres = 30.0 / Const.PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.filter(_.eclipticalFlag).flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -1633,7 +1629,7 @@ tweetMoonRiseSet();
     val altThres = 30.0 / Const.PI57;
     val time = startTime + day + 21.0 / 24;
     val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = bpn.icrsToTrueEquatorialMatrix(tdb);
+    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
     val constellations = constellationData.constellationData.filter(_.galaxyFlag).flatMap { constellation =>
       val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
       val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
@@ -1791,7 +1787,7 @@ tweetMoonRiseSet();
 
   (words.periodStart until period).foreach { day =>
     if (getTweets(startTime + day).size < 3 || !getTweets(startTime + day).tweets.map(_.time).exists(isLunchTime)) {
-      words.putTweetWord(day, bpn, hcs);
+      words.putTweetWord(day, hcs);
     }
   }
 }

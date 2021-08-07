@@ -1,5 +1,5 @@
 
-class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
+object Bpn {
 
   private val PI2 = Math.PI * 2.0;
   private val PI57 = 180.0 / Math.PI;
@@ -261,10 +261,12 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     (dpsi, deps);
   }
 
-  private def loadNutLs(path: String): IndexedSeq[IndexedSeq[Double]] = {
+  private def loadNutLs(): IndexedSeq[IndexedSeq[Double]] = {
     // L L' F D Om   PS PST PC EC ECT ES
+    val nutLsDataPath = "nut-ls.txt";
     val data1 = {
-      val sc = new java.util.Scanner(new java.io.BufferedInputStream(new java.io.FileInputStream(path)));
+      val sc = new java.util.Scanner(new java.io.BufferedInputStream(
+        getClass.getClassLoader.getResourceAsStream(nutLsDataPath)));
       val data1 = scala.collection.mutable.ArrayBuffer[String]();
       while (sc.hasNext) {
         data1 += sc.next();
@@ -285,10 +287,12 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     data2;
   }
 
-  private def loadNutPl(path: String): IndexedSeq[IndexedSeq[Double]] = {
+  private def loadNutPl(): IndexedSeq[IndexedSeq[Double]] = {
     // L L' F D Om Lm Lv Le LM Lj Ls Lu Ln Pa   PS PC ES EC
+    val nutPlDataPath = "nut-pl.txt";
     val data1 = {
-      val sc = new java.util.Scanner(new java.io.BufferedInputStream(new java.io.FileInputStream(path)));
+      val sc = new java.util.Scanner(new java.io.BufferedInputStream(
+        getClass.getClassLoader.getResourceAsStream(nutPlDataPath)));
       val data1 = scala.collection.mutable.ArrayBuffer[String]();
       while (sc.hasNext) {
         data1 += sc.next();
@@ -309,8 +313,8 @@ class Bpn(nutLsDataPath: String, nutPlDataPath: String) {
     data2;
   }
 
-  private val nutLsData: IndexedSeq[IndexedSeq[Double]] = loadNutLs(nutLsDataPath);
-  private val nutPlData: IndexedSeq[IndexedSeq[Double]] = loadNutPl(nutPlDataPath);
+  private val nutLsData: IndexedSeq[IndexedSeq[Double]] = loadNutLs();
+  private val nutPlData: IndexedSeq[IndexedSeq[Double]] = loadNutPl();
 
 }
 
