@@ -80,6 +80,7 @@ YYYY-12-02T10:05 1990年の今日は、秋山豊寛さんが日本人として�
 # http://www.esa.int/Science_Exploration/Space_Science/BepiColombo/BepiColombo_factsheet
 2021-08-11T09:10 探査機BepiColomboが金星をスイングバイ。BepiColomboは、水星を目的とした探査機で、日本とヨーロッパの共同プロジェクトです。2025年に水星周回軌道にに到着予定です
 2021-10-01T09:10 探査機BepiColomboが水星をスイングバイ。BepiColomboは、水星を目的とした探査機で、日本とヨーロッパの共同プロジェクトです。2025年に水星周回軌道にに到着予定です
+2022-06-23T09:10 探査機BepiColomboが水星をスイングバイ。BepiColomboは、水星を目的とした探査機で、日本とヨーロッパの共同プロジェクトです。2025年に水星周回軌道にに到着予定です
 
 # https://www.nasa.gov/press-release/nasa-s-osiris-rex-mission-plans-for-may-asteroid-departure
 # https://www.nasa.gov/feature/goddard/2021/nasa-osiris-rex-completes-final-tour-of-asteroid-bennu
@@ -89,6 +90,11 @@ YYYY-12-02T10:05 1990年の今日は、秋山豊寛さんが日本人として�
 # http://parkersolarprobe.jhuapl.edu/The-Mission/index.php#Timeline
 2021-08-09T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が近日点通過。パーカーソーラープローブは、太陽を観測するNASAの探査機です。最終的に太陽に0.04天文単位まで接近する予定です
 2021-10-16T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が金星をスイングバイ。パーカーソーラープローブは、太陽を観測するNASAの探査機です。金星を利用して減速を繰り返し、最終的に太陽に0.04天文単位まで接近する予定です
+2021-11-21T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が近日点通過。パーカーソーラープローブは、太陽を観測するNASAの探査機です。最終的に太陽に0.04天文単位まで接近する予定です
+2022-02-25T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が近日点通過。パーカーソーラープローブは、太陽を観測するNASAの探査機です。最終的に太陽に0.04天文単位まで接近する予定です
+2022-06-01T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が近日点通過。パーカーソーラープローブは、太陽を観測するNASAの探査機です。最終的に太陽に0.04天文単位まで接近する予定です
+2022-09-06T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が近日点通過。パーカーソーラープローブは、太陽を観測するNASAの探査機です。最終的に太陽に0.04天文単位まで接近する予定です
+2022-12-11T09:10 探査機パーカーソーラープローブ(Parker Solar Probe)が近日点通過。パーカーソーラープローブは、太陽を観測するNASAの探査機です。最終的に太陽に0.04天文単位まで接近する予定です
 
 
 ################################################################################

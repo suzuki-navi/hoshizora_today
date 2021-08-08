@@ -48,7 +48,7 @@ case class DateTweets(otherTweets: List[TweetContent],
   def removed(time: Double, message: String): DateTweets = {
     def p(tc: TweetContent): Boolean = {
       TimeLib.timeToDateTimeString(tc.time) == TimeLib.timeToDateTimeString(time) &&
-      tc.message == message;
+      tc.message == message || tc.tweetContent == message;
     }
     if (sunsetTweet.nonEmpty && p(sunsetTweet.get)) {
       this.copy(sunsetTweets = Nil);
