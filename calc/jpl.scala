@@ -149,23 +149,5 @@ object JplData {
     VectorLib.minus(target, earth);
   }
 
-  def calcPlanetLngTrueEcliptic(utc: Double, targetPlanet: JplData.TargetPlanet): Double = {
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val planet = JplData.calcPlanetFromEarth(tdb, targetPlanet);
-    val bpnMatrix = Bpn.icrsToTrueEclipticMatrix(tdb);
-    val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
-    val planetLng = VectorLib.xyzToLng(planet2);
-    planetLng;
-  }
-
-  def calcPlanetLngMeanEcliptic2000(utc: Double, targetPlanet: JplData.TargetPlanet): Double = {
-    val tdb = TimeLib.mjdutcToTdb(utc);
-    val planet = JplData.calcPlanetFromEarth(tdb, targetPlanet);
-    val bpnMatrix = Bpn.icrsToMeanEclipticMatrix2000;
-    val planet2 = VectorLib.multiplyMV(bpnMatrix, planet);
-    val planetLng = VectorLib.xyzToLng(planet2);
-    planetLng;
-  }
-
 }
 

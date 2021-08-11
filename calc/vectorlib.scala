@@ -110,6 +110,20 @@ object VectorLib {
     lat;
   }
 
+  // 地平座標系から方位角
+  // 地平座標系 X:西 Y:南 Z:天頂
+  def xyzToAzi(xyz: Array[Double]): Double = {
+    val x = xyz(0);
+    val y = xyz(1);
+    val azi = Math.atan2(-x, -y);
+    if (azi < 0) azi + Const.PI2 else azi;
+  }
+
+  // 地平座標系から高度
+  def xyzToAlt(xyz: Array[Double]): Double = {
+    xyzToLat(xyz);
+  }
+
   def calcLngDiff(lng1: Double, lng2: Double): Double = {
     val d = lng1 - lng2;
     if (d < 0) d + Const.PI2 else d;

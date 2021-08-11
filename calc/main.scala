@@ -27,12 +27,7 @@ val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, td
   val altHor = -0.90 / Const.PI57;
   (0 until Period.period).map { d =>
     val time = Lib2.findCrossingBoundaryTime(altHor, true, false, Period.startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
-      val tdb = TimeLib.mjdutcToTdb(time);
-      val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
-      val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-      val sun2 = VectorLib.multiplyMV(bpnMatrix, sun);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(sun2, time);
-      alt;
+      Acs.Horizontal.calcPlanetAlt(time, JplData.Sun, hcs);
     }
     val tdb = TimeLib.mjdutcToTdb(time);
     val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
@@ -50,12 +45,8 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
 }
 
 def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Array[Double], Double, Double) = {
-  val tdb = TimeLib.mjdutcToTdb(time);
-  val ut1 = time; // 近似的
-  val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-  val xyz = JplData.calcPlanetFromEarth(tdb, targetPlanet);
-  val xyz2 = VectorLib.multiplyMV(bpnMatrix, xyz);
-  val azialt = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
+  val xyz = Acs.Icrs.calcPlanetXyz(time, targetPlanet); // TODO この変数は本当にいるのか？
+  val azialt = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
   (xyz, azialt._1, azialt._2);
 }
 
@@ -463,7 +454,7 @@ SolarTerms.tweets.foreach { tw =>
   var day: Int = 0;
   var index: Int = {
     val time = Period.startTime + day + 0.5;
-    val lng = JplData.calcPlanetLngMeanEcliptic2000(time, JplData.Sun);
+    val lng = Acs.Ecliptic2000.calcPlanetLng(time, JplData.Sun);
     val index = meteorShowerData._1.indexWhere(_._1 > lng);
     if (index < 0) {
       0;
@@ -473,7 +464,7 @@ SolarTerms.tweets.foreach { tw =>
   }
   while (day < Period.period) {
     val time = Period.startTime + day + 0.5;
-    val lng = JplData.calcPlanetLngMeanEcliptic2000(time, JplData.Sun);
+    val lng = Acs.Ecliptic2000.calcPlanetLng(time, JplData.Sun);
     val d = MathLib.circleAdd(lng, -meteorShowerData._1(index)._1);
     if (d >= 0) {
       val time1 = time - 1.0 + 20.0 / 60 / 24;

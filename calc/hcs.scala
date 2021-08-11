@@ -1,5 +1,5 @@
 
-class Hcs(lng: Double, lat: Double) {
+class Hcs(val lng: Double, val lat: Double) {
 
   def siderealTimeFromUtc(utc: Double): Double = {
     val ut1 = utc; // 近似的
@@ -36,20 +36,14 @@ class Hcs(lng: Double, lat: Double) {
     trueEquatorialXyzToAziAltFromUt1(xyz, ut1);
   }
 
+  // TODO Acs.Hcsに移行予定
   def trueEquatorialXyzToAziAltFromUt1(xyz: Array[Double], ut1: Double): (Double, Double) = {
     var r: Array[Double] = VectorLib.unitMatrix;
     r = VectorLib.rotateMatrixZ(Const.PI5 - siderealTimeFromUt1(ut1), r);
     r = VectorLib.rotateMatrixX(Const.PI5 - lat, r);
     // 地平座標系 X:西 Y:南 Z:天頂
     val hcs = VectorLib.multiplyMV(r, xyz);
-    val x = hcs(0);
-    val y = hcs(1);
-    val z = hcs(2);
-    val azi1 = Math.atan2(-x, -y);
-    val azi = if (azi1 < 0) azi1 + Const.PI2 else azi1; // 北0°、東90°、南180°、西270°
-    val xy = Math.sqrt(x * x + y * y);
-    val alt = Math.atan2(z, xy);
-    (azi, alt);
+    (VectorLib.xyzToAzi(hcs), VectorLib.xyzToAlt(hcs));
   }
 
 }

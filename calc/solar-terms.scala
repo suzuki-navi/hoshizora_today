@@ -29,7 +29,7 @@ object SolarTerms {
       ("啓蟄", ""),
     );
     val sunPhaseTerms = MathLib.findCyclicPhaseListContinuous(24, Period.startTime, Period.endTime, 3.0, 24) { time =>
-      JplData.calcPlanetLngTrueEcliptic(time, JplData.Sun);
+      Acs.EclipticTrue.calcPlanetLng(time, JplData.Sun);
     }
     sunPhaseTerms.map { case (time, term) =>
       val tweetTime = TimeLib.floor(time, 24) + 1.0 / (24 * 4);
