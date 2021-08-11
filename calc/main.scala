@@ -1571,9 +1571,9 @@ tweetMoonRiseSet();
     val altHor = -0.90 / Const.PI57;
     var index: Int = -1;
     val culminationContents = Constellations.culminationContents;
-    (28 until Period.period).foreach { day => // PERIOD 2021/04/28
+    (115 until Period.period).foreach { day => // PERIOD 2021/07/24
       if (index < 0) {
-        val time = Period.startTime + day + 20.9 / 24.0; // PERIOD
+        val time = Period.startTime + day + 21.0 / 24.0; // PERIOD
         val sid = hcs.siderealTimeFromUtc(time);
         index = culminationContents.indexWhere(_._1 > sid);
         if (index < 0) {
