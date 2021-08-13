@@ -1244,47 +1244,8 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
 // 21時・23時の惑星
 //==============================================================================
 
-{
-  val altThres = 15 / Const.PI57;
-  (0 until Period.period).foreach { d =>
-    val time = Period.startTime + d + 21.0 / 24.0;
-    val wday = TimeLib.wday(time);
-    val (planetName, targetPlanet) = if (wday == 2) {
-      ("火星", Some(JplData.Mars));
-    } else if (wday == 4) {
-      ("木星", Some(JplData.Jupiter));
-    } else if (wday == 6) {
-      ("土星", Some(JplData.Saturn));
-    } else {
-      ("", None);
-    }
-    targetPlanet match {
-      case None => ;
-      case Some(targetPlanet) =>
-        {
-          val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
-          if (alt >= altThres) {
-            Some((time, azi, alt));
-          } else {
-            val time = Period.startTime + d + 23.0 / 24.0;
-            val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
-            if (alt >= altThres) {
-              Some((time, azi, alt));
-            } else {
-              None;
-            }
-          }
-        } match {
-          case None => ;
-          case Some((time, azi, alt)) =>
-            val xyz = Acs.Icrs.calcPlanetXyz(time, targetPlanet);
-            val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
-            val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
-            tweetsManager.putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
-              hashtags.map(" #" + _).mkString);
-        }
-    }
-  }
+OuterPlanets.nightTweets(hcs).foreach { tw =>
+  tweetsManager.putTweet(tw);
 }
 
 // 惑星が見えない場合

@@ -33,6 +33,9 @@ case class LegacyTweetContent(time: Double, message: String,
   def hashtags: List[String] = Nil;
 }
 
+case class BasicTweetContent(time: Double, message: String,
+  override val urlOpt: Option[String], hashtags: List[String], starNames: List[String]) extends  TweetContent;
+
 case class DateTweets(otherTweets: List[TweetContent],
   sunsetTweets: List[Main.OnSunsetTweetContent]) {
   def isEmpty: Boolean = otherTweets.isEmpty && sunsetTweets.isEmpty;
