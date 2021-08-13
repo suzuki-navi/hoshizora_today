@@ -44,16 +44,10 @@ def calcPlanetOnSunsetTime(day: Int, targetPlanet: JplData.TargetPlanet): (Doubl
   hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
 }
 
-def calcPlanetXyzAziAlt(time: Double, targetPlanet: JplData.TargetPlanet): (Array[Double], Double, Double) = {
-  val xyz = Acs.Icrs.calcPlanetXyz(time, targetPlanet); // TODO この変数は本当にいるのか？
-  val azialt = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
-  (xyz, azialt._1, azialt._2);
-}
-
 def calcRiseSetCulmination(targetPlanet: JplData.TargetPlanet, altHor: Double):
   IndexedSeq[(Double, Double, Double, Double)] = { // 出, 南中, 没, 南中高度
   val riseSet = MathLib.findMaxMinCrossingListContinuous(Period.startTime, Period.endTime, 0.25, 24 * 6) { time =>
-    calcPlanetXyzAziAlt(time, targetPlanet)._3 - altHor;
+    Acs.Horizontal.calcPlanetAlt(time, targetPlanet, hcs) - altHor;
   }.filter(_._2 % 2 == 0);
   var result: List[(Double, Double, Double, Double)] = Nil;
   (0 until (riseSet.size - 1)).foreach { i =>
@@ -62,15 +56,9 @@ def calcRiseSetCulmination(targetPlanet: JplData.TargetPlanet, altHor: Double):
       val (time2, flag2) = riseSet(i + 1);
       val time1 = Lib2.findCrossingBoundaryTime(0.0, false, false,
         time0, 24 * 6, ((time2 - time0) * 24 * 6).toInt) { time =>
-        calcPlanetXyzAziAlt(time, JplData.Moon)._2 - Const.PI;
+        Acs.Horizontal.calcPlanetAzi(time, targetPlanet, hcs) - Const.PI;
       }
-      val xyz = calcPlanetXyzAziAlt(time1, targetPlanet)._1;
-      val x = xyz(0);
-      val y = xyz(1);
-      val z = xyz(2);
-      val xy = Math.sqrt(x * x + y * y);
-      val altm = Math.atan2(z, xy);
-      val alt = altm + Const.PI5 - tokyoLat;
+      val alt = Acs.Horizontal.calcPlanetAlt(time1, targetPlanet, hcs);
       result = (time0, time1, time2, alt) :: result;
     }
   }
@@ -307,8 +295,7 @@ val outerPlanetsNightAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = oute
   }
   (0 until period2).map { day =>
     val time = Period.startTime + day + 21.0 / 24.0;
-    val t = calcPlanetXyzAziAlt(time, planet._2);
-    (t._2, t._3);
+    Acs.Horizontal.calcPlanetAziAlt(time, planet._2, hcs);
   }
 }
 
@@ -1223,21 +1210,22 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
     val time = Period.startTime + d + 21.0 / 24.0 - 1.0 / (24 * 6);
     if (!tweetsManager.getTweets(time).tweets.filter(tc => isNightTime0(tc.time)).flatMap(_.starNames).contains("月")) {
       {
-        val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
+        val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, JplData.Moon, hcs);
         if (alt >= altThres) {
-          Some((time, xyz, azi, alt));
+          Some((time, azi, alt));
         } else {
           val time = Period.startTime + d + 23.0 / 24.0;
-          val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, JplData.Moon);
+          val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, JplData.Moon, hcs);
           if (alt >= altThres) {
-            Some((time, xyz, azi, alt));
+            Some((time, azi, alt));
           } else {
             None;
           }
         }
       } match {
         case None => ;
-        case Some((time, xyz, azi, alt)) =>
+        case Some((time, azi, alt)) =>
+          val xyz = Acs.Icrs.calcPlanetXyz(time, JplData.Moon);
           val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
           val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
           if (azi >= Const.PI) {
@@ -1274,21 +1262,22 @@ case class CloseStarsTweetContent(rawTime: Double, stepCountPerDay: Int, slowSta
       case None => ;
       case Some(targetPlanet) =>
         {
-          val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
+          val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
           if (alt >= altThres) {
-            Some((time, xyz, azi, alt));
+            Some((time, azi, alt));
           } else {
             val time = Period.startTime + d + 23.0 / 24.0;
-            val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
+            val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
             if (alt >= altThres) {
-              Some((time, xyz, azi, alt));
+              Some((time, azi, alt));
             } else {
               None;
             }
           }
         } match {
           case None => ;
-          case Some((time, xyz, azi, alt)) =>
+          case Some((time, azi, alt)) =>
+            val xyz = Acs.Icrs.calcPlanetXyz(time, targetPlanet);
             val (cons, hashtags) = Constellations.icrsToConstellation(xyz);
             val hcsStr = Hcs.aziAltToNaturalString(azi, alt);
             tweetsManager.putTweet(time - 1.0 / (24 * 4), "%sは%s、%sにいます #%s".format(planetName, hcsStr, cons, planetName) +
@@ -1446,7 +1435,7 @@ tweetMoonRiseSet();
     }) ++
     (List(("月", JplData.Moon), ("金星", JplData.Venus), ("火星", JplData.Mars), ("木星", JplData.Jupiter), ("土星", JplData.Saturn)).
       flatMap { case (name, targetPlanet) =>
-      val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
+      val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
       if (alt >= altThres) {
         Some((azi, name));
       } else {
@@ -1479,7 +1468,7 @@ tweetMoonRiseSet();
     }) ++
     (List(("水星", JplData.Mercury, -2.5), ("金星", JplData.Venus, -4.9), ("火星", JplData.Mars, -2.8), ("木星", JplData.Jupiter, -2.9), ("土星", JplData.Saturn, -0.6)).
       flatMap { case (name, targetPlanet, magnitude) =>
-      val (xyz, azi, alt) = calcPlanetXyzAziAlt(time, targetPlanet);
+      val (azi, alt) = Acs.Horizontal.calcPlanetAziAlt(time, targetPlanet, hcs);
       val aziAltStr = Hcs.aziAltToNaturalString(azi, alt);
       if (alt >= altHor) {
         Some((azi, alt, name, aziAltStr, magnitude));
@@ -1595,7 +1584,7 @@ tweetMoonRiseSet();
           0.0;
         }
         if (time0 > 0.0) {
-          val msg = if (calcPlanetXyzAziAlt(time0, JplData.Moon)._3 >= altHor) {
+          val msg = if (Acs.Horizontal.calcPlanetAlt(time0, JplData.Moon, hcs) >= altHor) {
             culminationContents(index)._2;
           } else {
             culminationContents(index)._2 + "。月明かりなし";
