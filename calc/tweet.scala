@@ -19,9 +19,9 @@ trait TweetContent {
         (msg, length);
     }
     if (msg.indexOf("ERROR") >= 0) {
-      "#" + msg;
+      "##" + msg;
     } else if (length > 140) {
-      "#TOO_LONG(%d) %s".format(length, msg);
+      "##TOO_LONG(%d) %s".format(length, msg);
     } else {
       msg;
     }
@@ -58,7 +58,7 @@ case class DateTweets(otherTweets: List[TweetContent],
     } else if (otherTweets.exists(p)) {
       this.copy(otherTweets = otherTweets.filter(!p(_)));
     } else {
-      added(LegacyTweetContent(time, "#-" + message, None, Nil));
+      added(LegacyTweetContent(time, "##-" + message, None, Nil));
     }
   }
   val sunsetTweet: Option[TweetContent] = {

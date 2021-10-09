@@ -1674,13 +1674,13 @@ tweetMoonRiseSet();
     (0 until Period.period).foreach { day =>
       val time = Period.startTime + day;
       if (tweetsManager.getTweets(time).isEmpty) {
-        tweetsManager.putTweet(time, "#empty");
+        tweetsManager.putTweet(time, "##empty");
       } else {
         //if (tweetsManager.getTweets(time).tweets.map(_.time).filter(isNightTime0).isEmpty) {
         if (tweetsManager.getTweets(time).tweets.map(_.time).filter(isNightTime3).isEmpty) {
-          tweetsManager.putTweet(time + 23.0 / 24, "#night empty");
+          tweetsManager.putTweet(time + 23.0 / 24, "##night empty");
         } else if (!tweetsManager.getTweets(time).tweets.exists(tc => DateTweets.isDayTime(tc.time))) {
-          tweetsManager.putTweet(time + 9.0 / 24, "#daytime empty");
+          tweetsManager.putTweet(time + 9.0 / 24, "##daytime empty");
         }
       }
     }
