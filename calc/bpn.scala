@@ -1,6 +1,11 @@
 
 object Bpn {
 
+  // L L' F D Om   PS PST PC EC ECT ES
+  private val nutLsDataPath = "nut-ls.txt";
+  // L L' F D Om Lm Lv Le LM Lj Ls Lu Ln Pa   PS PC ES EC
+  private val nutPlDataPath = "nut-pl.txt";
+
   private val PI2 = Math.PI * 2.0;
   private val PI57 = 180.0 / Math.PI;
   private val PI_AS2R = Math.PI / (3600 * 180);
@@ -262,8 +267,6 @@ object Bpn {
   }
 
   private def loadNutLs(): IndexedSeq[IndexedSeq[Double]] = {
-    // L L' F D Om   PS PST PC EC ECT ES
-    val nutLsDataPath = "nut-ls.txt";
     val data1 = {
       val sc = new java.util.Scanner(new java.io.BufferedInputStream(
         getClass.getClassLoader.getResourceAsStream(nutLsDataPath)));
@@ -288,8 +291,6 @@ object Bpn {
   }
 
   private def loadNutPl(): IndexedSeq[IndexedSeq[Double]] = {
-    // L L' F D Om Lm Lv Le LM Lj Ls Lu Ln Pa   PS PC ES EC
-    val nutPlDataPath = "nut-pl.txt";
     val data1 = {
       val sc = new java.util.Scanner(new java.io.BufferedInputStream(
         getClass.getClassLoader.getResourceAsStream(nutPlDataPath)));
