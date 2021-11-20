@@ -12,12 +12,15 @@ object Diff {
       if (line != "" && !line.startsWith("#")) {
         val cols = line.split(" ", 2);
         val time = TimeLib.stringToModifiedJulianDay(cols(0) + ":00+09:00");
-        val sign = cols(1).charAt(0);
-        val content = cols(1).substring(1);
-        if (sign == '-') {
-          diffData = (time, -1, content) :: diffData;
-        } else if (sign == '+') {
-          diffData = (time, +1, content) :: diffData;
+        val s = cols(1);
+        if (s.startsWith("++")) {
+          diffData = (time, +2, s.substring(2)) :: diffData;
+        } else if (s.startsWith("--")) {
+          diffData = (time, -2, s.substring(2)) :: diffData;
+        } else if (s.startsWith("+")) {
+          diffData = (time, +1, s.substring(1)) :: diffData;
+        } else if (s.startsWith("-")) {
+          diffData = (time, -1, s.substring(1)) :: diffData;
         }
       }
     }
@@ -27,13 +30,25 @@ object Diff {
   }
 
   def removeTweets1(tweetsManager: Tweets): Unit = {
-    diffData.filter(_._2 < 0).foreach { d =>
-      tweetsManager.removeTweet(d._1, d._3);
+    diffData.filter(_._2 == -1).foreach { d =>
+      tweetsManager.removeTweet(d._1, d._3, true);
     }
   }
 
   def putTweets1(tweetsManager: Tweets): Unit = {
-    diffData.filter(_._2 > 0).foreach { d =>
+    diffData.filter(_._2 == +1).foreach { d =>
+      tweetsManager.putTweet(d._1, d._3);
+    }
+  }
+
+  def removeTweets2(tweetsManager: Tweets): Unit = {
+    diffData.filter(_._2 == -2).foreach { d =>
+      tweetsManager.removeTweet(d._1, d._3, true);
+    }
+  }
+
+  def putTweets2(tweetsManager: Tweets): Unit = {
+    diffData.filter(_._2 == +2).foreach { d =>
       tweetsManager.putTweet(d._1, d._3);
     }
   }

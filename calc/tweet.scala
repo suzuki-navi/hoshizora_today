@@ -48,17 +48,19 @@ case class DateTweets(otherTweets: List[TweetContent],
         this.copy(otherTweets = tc :: this.otherTweets);
     }
   }
-  def removed(time: Double, message: String): DateTweets = {
+  def removed(time: Double, message: String, force: Boolean): (DateTweets, Boolean) = {
     def p(tc: TweetContent): Boolean = {
       TimeLib.timeToDateTimeString(tc.time) == TimeLib.timeToDateTimeString(time) &&
       tc.message == message || tc.tweetContent == message;
     }
     if (sunsetTweet.nonEmpty && p(sunsetTweet.get)) {
-      this.copy(sunsetTweets = Nil);
+      (this.copy(sunsetTweets = Nil), true);
     } else if (otherTweets.exists(p)) {
-      this.copy(otherTweets = otherTweets.filter(!p(_)));
+      (this.copy(otherTweets = otherTweets.filter(!p(_))), true);
+    } else if (force) {
+      (added(LegacyTweetContent(time, "##-" + message, None, Nil)), true);
     } else {
-      added(LegacyTweetContent(time, "##-" + message, None, Nil));
+      (this, false);
     }
   }
   val sunsetTweet: Option[TweetContent] = {
@@ -123,11 +125,16 @@ class Tweets() {
     putTweet(LegacyTweetContent(time, msg, None, starNames));
   }
 
-  def removeTweet(time: Double, message: String): Unit = {
+  def removeTweet(time: Double, message: String, force: Boolean): Boolean = {
     val date = TimeLib.timeToDateString(time);
     if (_tweets.contains(date)) {
       val tw = _tweets(date);
-      _tweets = _tweets.updated(date, tw.removed(time, message));
+      val (removedTw, result) = tw.removed(time, message, force);
+      _tweets = _tweets.updated(date, removedTw);
+      result;
+    } else {
+      // このケースは考慮しなくていいはず
+      false;
     }
   }
 
