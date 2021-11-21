@@ -796,10 +796,13 @@ case class SunsetMoonTweetContent(day: Int, azi: Double, alt: Double) extends On
   def starNames: List[String] = List("月");
 }
 case class SunsetPlanetTweetContent(day: Int, planetName: String,
-  azi: Double, alt: Double, isIncreasing: Boolean, isDecreasing: Boolean, isMax: Boolean) extends OnSunsetTweetContent {
+  azi: Double, alt: Double, isIncreasing: Boolean, isDecreasing: Boolean, isMax: Boolean, isSouthMax: Boolean = false) extends OnSunsetTweetContent {
   def alt360: Int = (alt * Const.PI57 + 0.5).toInt;
+  def azi360: Int = (azi * Const.PI57 + 0.5).toInt;
   def message: String = if (isMax) {
     "%sは日没時最大高度で西の空高度約%d°".format(planetName, alt360);
+  } else if (isSouthMax) {
+    "%sは日没時に見える方向がもっとも南寄りで方位角約%d度、高度約%d°".format(planetName, azi360, alt360);
   } else if (isIncreasing) {
     "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
   } else if (isDecreasing) {
@@ -809,6 +812,8 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   }
   def message2: String = if (isMax) {
     "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
+  } else if (isSouthMax) {
+    "%sは日没時に見える方向がもっとも南寄りで方位角約%d度、高度約%d°です".format(planetName, azi360, alt360);
   } else if (isIncreasing) {
     "%sは日没時の高度を徐々に上げ、西の空高度約%d°にいます".format(planetName, alt360);
   } else if (isDecreasing) {
@@ -818,6 +823,8 @@ case class SunsetPlanetTweetContent(day: Int, planetName: String,
   }
   def message3: String = if (isMax) {
     "%sは日没時最大高度で西の空高度約%d°です".format(planetName, alt360);
+  } else if (isSouthMax) {
+    "%sは日没時に見える方向がもっとも南寄りで方位角約%d度、約%d°です".format(planetName, azi360, alt360);
   } else if (isIncreasing) {
     "%sは日没時の高度を徐々に上げ、約%d°にいます".format(planetName, alt360);
   } else if (isDecreasing) {
@@ -897,6 +904,25 @@ case class SunsetFirstStarTweetContent(day: Int, msg: String, starNames: List[St
     }
   }
 }
+/*
+// もっとも南寄りになる日の計算
+{
+  val planets = IndexedSeq(("金星", JplData.Venus), ("水星", JplData.Mercury));
+  planets.foreach { p =>
+    MathLib.findMaxMinListDiscrete(0, Period.period, 15) { day =>
+      val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+      azi;
+    }.foreach { case (day, flag) =>
+      if (flag < 0) {
+        val (azi, alt) = calcPlanetOnSunsetTime(day, p._2);
+        if (alt > 0) {
+          tweetsManager.putTweet(SunsetPlanetTweetContent(day, p._1, azi, alt, false, false, false, true));
+        }
+      }
+    }
+  }
+}
+*/
 
 // 新月直後の月
 {
