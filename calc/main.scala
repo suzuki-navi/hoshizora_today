@@ -1326,26 +1326,7 @@ Diff.putTweets1(tweetsManager);
     def hashtags: List[String] = hashtags2 ::: "星空" :: "星座" :: Nil;
   }
 
-  // この時期21時ごろ見えやすい星座
-  def putTweetConstellations21(day: Int): Unit = {
-    val altThres = 30.0 / Const.PI57;
-    val time = Period.startTime + day + 21.0 / 24;
-    val tdb = TimeLib.mjdutcToTdb(time);
-    val bpnMatrix = Bpn.icrsToTrueEquatorialMatrix(tdb);
-    val constellations = Constellations.constellationData.flatMap { constellation =>
-      val xyz2 = VectorLib.multiplyMV(bpnMatrix, constellation.xyz);
-      val (azi, alt) = hcs.trueEquatorialXyzToAziAltFromUtc(xyz2, time);
-      if (alt >= altThres) {
-        Some((azi, constellation.name));
-      } else {
-        None;
-      }
-    }
-    val constellationsStr = constellations.sortBy(-_._1).map(_._2).mkString("、");
-    val starNames = constellations.sortBy(-_._1).map(_._2).toList;
-    val msg = "この時期21時ごろ見えやすい星座は、%sです #星空 #星座".format(constellationsStr);
-    tweetsManager.putTweet(Period.startTime + day + (12.0 + 35.0 / 60) / 24, msg, starNames);
-  }
+  // TODO twconst.scala に移動中
 
   // この時期21時ごろ見える南の空低い星座
   def putTweetConstellationsSouth(day: Int): Boolean = {
@@ -1612,7 +1593,7 @@ Diff.putTweets1(tweetsManager);
       val wday = TimeLib.wday(Period.startTime + day);
       if (wday == 1) { // 月曜
         if ((Period.startTime + day).toInt % 2 == 0) {
-          putTweetConstellations21(day);
+          tweetsManager.putTweet(TweetConstellations.constellations21Tweet(day, hcs));
         } else {
           var i: Int = 0;
           var f = false;
