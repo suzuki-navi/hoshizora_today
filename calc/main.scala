@@ -22,9 +22,12 @@ words.loadHistory(wordHistoryPath);
 // イベント計算
 //==============================================================================
 
+// 金星が次に見える時期を計算するために日没時刻は期間を延ばして計算
+val sunsetTimesDataPeriod = Period.period max (Period.startTime1 - Period.startTime + 600).toInt;
+
 val sunsetTimesData: IndexedSeq[(Double, Double, Array[Double])] = { // time, tdb, bpnMatrix
   val altHor = -0.90 / Const.PI57;
-  (0 until Period.period).map { d =>
+  (0 until sunsetTimesDataPeriod).map { d =>
     val time = Lib2.findCrossingBoundaryTime(altHor, true, false, Period.startTime + d + 16.0 / 24.0, 24 * 6, 4 * 6) { time =>
       Acs.Horizontal.calcPlanetAlt(time, JplData.Sun, hcs);
     }
@@ -276,7 +279,7 @@ val innerPlanets = IndexedSeq(
   ("水星", JplData.Mercury, 3)
 );
 val innerPlanetsSunsetAziAltList: IndexedSeq[IndexedSeq[(Double, Double)]] = innerPlanets.map { planet =>
-  (0 until Period.period).map { day =>
+  (0 until sunsetTimesDataPeriod).map { day =>
     calcPlanetOnSunsetTime(day, planet._2);
   }
 }
