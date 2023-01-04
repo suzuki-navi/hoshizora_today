@@ -589,8 +589,12 @@ MathLib.findMaxMinListContinuous(Period.startTime, Period.endTime, 30, 24) { tim
   val sun = JplData.calcPlanetFromEarth(tdb, JplData.Sun);
   VectorLib.distance(sun);
 }.foreach { case (time, flag) =>
-  val s = if (flag < 0) "近日点" else "遠日点";
-  tweetsManager.putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), "地球が%s通過".format(s));
+  val s = if (flag < 0) {
+    "地球が近日点通過。地球が太陽にもっとも近づく日です";
+  } else {
+    "地球が遠日点通過。地球が太陽からもっとも遠くなる日です";
+  }
+  tweetsManager.putTweet(TimeLib.round(time, 24) - 1.0 / (24 * 4), s);
 }
 
 //--------------------------------------
