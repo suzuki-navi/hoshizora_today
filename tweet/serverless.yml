@@ -1,11 +1,11 @@
 service: hoshizora-tweet
-frameworkVersion: '2'
+frameworkVersion: '3'
 
 custom:
   environment: ${file(./config.yml)}
 provider:
   name: aws
-  runtime: python3.8
+  runtime: python3.10
   profile: ${self:custom.environment.profile}
   region: ap-northeast-1
   iamManagedPolicies:

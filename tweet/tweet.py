@@ -4,7 +4,7 @@ import os
 import urllib
 
 import boto3
-import twitter
+import tweepy
 
 TIME_UNIT = 5
 
@@ -62,14 +62,13 @@ def readS3Object():
     return res['Body'].read().decode("utf-8")
 
 def tweet(message):
-    auth = twitter.OAuth(
-        consumer_key    = twitter_consumer_key,
-        consumer_secret = twitter_consumer_secret,
-        token           = twitter_token,
-        token_secret    = twitter_token_secret,
+    client = tweepy.Client(
+        consumer_key        = twitter_consumer_key,
+        consumer_secret     = twitter_consumer_secret,
+        access_token        = twitter_token,
+        access_token_secret = twitter_token_secret,
        )
-    client = twitter.Twitter(auth = auth)
-    client.statuses.update(status = message)
+    client.create_tweet(text = message)
 
 def postSlack(message):
     post_data = { "text": message }
